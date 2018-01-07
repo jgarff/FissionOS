@@ -35,6 +35,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "saml_clocks.h"
 #include "saml_port.h"
@@ -62,7 +63,27 @@
 #include "samd53.h"
 
 
+#define PWM_MODE_LINEAR                          0
+#define PWM_MODE_GAMMA                           1
+#define PWM_MODE_DISABLED                        2
+
+char *pwm_modestr[] = {
+    [PWM_MODE_LINEAR]   = "Linear",
+    [PWM_MODE_GAMMA]    = "Gamma",
+    [PWM_MODE_DISABLED] = "Disabled",
+};
+
 console_t console;
+
+typedef struct 
+{
+    int pwm_mode;
+} settings_t;
+
+settings_t current_settings =
+{
+    .pwm_mode = PWM_MODE_GAMMA,
+};
 
 
 //
@@ -85,10 +106,14 @@ cmd_entry_t cmd_table[] =
     {
         .cmdstr = "status",
         .callback = cmd_status,
-        .usage = "  status show\r\n",
+        .usage = "  status < show | set <key> <value> >\r\n",
         .help =
             "  Show values of the analog channels.\r\n"
             "    show       : Show values in mV.\r\n"
+            "    set        : Set <key> to <value>.\r\n"
+            "\r\n"
+            "  Key/Values:\r\n"
+            "    pwmmode    : linear, gamma, disable\r\n"
     },
     CONSOLE_CMD_USB,
 };
@@ -97,7 +122,7 @@ cmd_entry_t cmd_table[] =
 adc_desc_t adc0;
 const adc_calc_voltage_divider_t adc_calc_10_1_divider =
 {
-    .mvref = 1000,
+    .mvref = ADVREF_mV,
     .r1 = 10000,
     .r2 = 1000,
 };
@@ -164,7 +189,7 @@ adc_queue_entry_t adc_queue =
     .complete = adc_complete,
 };
 
-uint32_t samples = 0;
+uint32_t pwmvals[ARRAY_SIZE(adc_values)];
 void adc_worker(void *arg);
 workqueue_t adc_wq =
 {
@@ -177,14 +202,34 @@ void adc_worker(void *arg)
 
     adc_queue.complete_arg = &adc_wq;
     adc_start(&adc0, &adc_queue);
-    samples++;
 
     for (i = 0; i < ARRAY_SIZE(adc_values); i++)
     {
         volatile int irqstate = irq_save();
-        uint32_t value = (*adc_values[i] * TCC0_MAX) / 10000;  // Convert mV to percent of TCC0_MAX
+        uint32_t pwmval;
+        float value;
+        float gamma;
 
-        tcc_pwm_duty(TCC0, i, value);
+        switch (current_settings.pwm_mode)
+        {
+            case PWM_MODE_LINEAR:
+                pwmval = (*adc_values[i] * TCC0_MAX) / 10000;  // Convert mV to percent of TCC0_MAX
+                break;
+
+            case PWM_MODE_GAMMA:
+                value = *adc_values[i] / (float)ADCMAX_mV;  // Convert mV to percent
+                gamma = powf(value, GAMMA_EXPONENT);
+                pwmval = gamma * TCC0_MAX;
+                break;
+
+            default:
+                pwmval = 0;
+                break;
+        }
+
+        pwmvals[i] = pwmval;
+
+        tcc_pwm_duty(TCC0, i, pwmval);
 
         irq_restore(irqstate);
     }
@@ -231,12 +276,40 @@ int cmd_status(console_t *console, int argc, char *argv[])
         int i;
 
         console_print(console, "VBUS  : %s\r\n", port_get(VBUS_PORT, VBUS_PIN) ? "High" : "Low");
-        console_print(console, "Status: (%d samples taken)\r\n", samples * 64);
+        console_print(console, "PWM   : %s\r\n", pwm_modestr[current_settings.pwm_mode]);
+        console_print(console, "\r\n");
+        console_print(console, "ADC Status:\r\n");
         for (i = 0; i < ARRAY_SIZE(adc_values); i++)
         {
             int value = *adc_values[i];
-            console_print(console, "  %2d (%05d): %d.%03d\r\n", 
-                          i, value, value / 1000, value % 1000);
+            console_print(console, "  %2d (%05d): %d.%03d, %d\r\n", 
+                          i, value, value / 1000, value % 1000, pwmvals[i]);
+        }
+    }
+    else if ((argc == 4) && !strcmp(argv[1], "set"))
+    {
+        if (!strcmp(argv[2], "pwmmode"))
+        {
+            if (!strcmp(argv[3], "linear"))
+            {
+                current_settings.pwm_mode = PWM_MODE_LINEAR;
+            }
+            else if (!strcmp(argv[3], "gamma"))
+            {
+                current_settings.pwm_mode = PWM_MODE_GAMMA;
+            }
+            else if (!strcmp(argv[3], "disable"))
+            {
+                current_settings.pwm_mode = PWM_MODE_DISABLED;
+            }
+            else
+            {
+                cmd_help_usage(console, argv[0]);
+            }
+        }
+        else
+        {
+            cmd_help_usage(console, argv[0]);
         }
     }
     else
@@ -495,7 +568,8 @@ int main(int argc, char *argv[])
     port_strength(LED_PORT, LED_PIN, PORT_DRIVE_HIGH);
     port_peripheral_enable(LED_PORT, LED_PIN, LED_MUX);
 
-    tcc_pwm_init(LED_TCC, TCC_CTRLA_PRESCALER_DIV1, (1 << LED_TCC_CHANNEL), LED_TCC_MAX - 2);
+    tcc_pwm_init(LED_TCC, TCC_CTRLA_PRESCALER_DIV1,
+                 (1 << LED_TCC_CHANNEL), LED_TCC_MAX - 2);
     status_worker(NULL);
 
     // Setup the USB state

@@ -87,8 +87,7 @@
 #define ADC0_AIN3_PIN                            9
 #define ADC_MUX                                  2
 
-#define TCC0_MAX                                 48000
-
+#define TCC0_MAX                                 9600   // 5Khz @ 48Mhz reference
 
 #define SRAM_ADDR                                0x20000000
 
@@ -108,6 +107,10 @@
 #define LED_TCC_CHANNEL                          0
 #define STATUS_MAX                               16
 #define LED_TCC_MAX                              (1 << STATUS_MAX)
+
+#define ADVREF_mV                                1000
+#define GAMMA_EXPONENT                           2.2
+#define ADCMAX_mV                                10000
 
 typedef struct imghdr
 {

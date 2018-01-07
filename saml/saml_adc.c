@@ -201,8 +201,8 @@ static void adc_hw_setup(adc_desc_t *desc, adc_drv_t *adc_drv)
 
     adc_drv->total = 0;
 
-    // Average 64 samples
-    adc->avgctrl = ADC_AVGCTRL_SAMPLENUM(0x6) | 
+    // Average 1024 samples
+    adc->avgctrl = ADC_AVGCTRL_SAMPLENUM(0xa) | 
                    ADC_AVGCTRL_ADJRES(0x4);
 
     // Input

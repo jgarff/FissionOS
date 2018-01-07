@@ -300,7 +300,7 @@ def cortexm_builders(env):
 
     env.Append(BUILDERS = {
         'Elf': SCons.Builder.Builder(
-            action = SCons.Action.Action("${LINK} -lc -lm ${LINKFLAGS} -Wl,--start-group ${SOURCES} -Wl,--end-group -o ${TARGET}", "${ELFCOMSTR}"),
+            action = SCons.Action.Action("${LINK} ${LINKFLAGS} -Wl,--start-group ${SOURCES} -Wl,--end-group -lc -lm -o ${TARGET}", "${ELFCOMSTR}"),
             suffix = '.elf'
         ),
         'Hex' : SCons.Builder.Builder(
