@@ -63,6 +63,14 @@
 #include "samd53_version.h"
 #include "samd53.h"
 
+#define ADC_ADJUST_MAX                           SYSTICK_FREQ
+
+#define ADC_STATE_SAMPLE                         0
+#define ADC_STATE_ADJUST                         1
+
+uint32_t adc_state = ADC_STATE_SAMPLE;
+uint32_t adc_adjust_count = 0;
+uint64_t adc_samples = 0;
 
 #define PWM_MODE_LINEAR                          0
 #define PWM_MODE_GAMMA                           1
@@ -78,12 +86,14 @@ console_t console;
 
 typedef struct 
 {
+    int average_seconds;
     int pwm_mode;
     float pwm_gamma_exponent;
 } settings_t;
 
 settings_t current_settings =
 {
+    .average_seconds = ADC_ADJUST_MAX,
     .pwm_mode = PWM_MODE_GAMMA,
     .pwm_gamma_exponent = GAMMA_EXPONENT,
 };
@@ -119,6 +129,8 @@ cmd_entry_t cmd_table[] =
             "    pwmmode    : linear, gamma, disable\r\n"
             "    pwmgamma   : <exponent value>\r\n"
             "                 Default exponent value is 2.2\r\n"
+            "    avgsecs    : <seconds>\r\n"
+            "                 Number of seconds for light change transisiton\r\n",
     },
     CONSOLE_CMD_USB,
 };
@@ -181,9 +193,48 @@ uint32_t *adc_values[] =
     &adc0_ain3_value,
 };
 
+uint32_t pwmvals[ARRAY_SIZE(adc_values)];
+uint32_t pwmprevs[ARRAY_SIZE(adc_values)];
+uint32_t adc_compute_pwmval(uint32_t adc_value)
+{
+    uint32_t pwmval;
+    float value;
+    float gamma;
+
+    switch (current_settings.pwm_mode)
+    {
+        case PWM_MODE_LINEAR:
+            pwmval = (adc_value * TCC0_MAX) / 10000;  // Convert mV to percent of TCC0_MAX
+            break;
+
+        case PWM_MODE_GAMMA:
+            value = adc_value / (float)ADCMAX_mV;  // Convert mV to percent
+            gamma = powf(value, current_settings.pwm_gamma_exponent);
+            pwmval = gamma * TCC0_MAX;
+            break;
+
+        default:
+            pwmval = 0;
+            break;
+    }
+
+    return pwmval;
+}
+
 void adc_complete(adc_drv_t **adc, uint32_t count, void *arg)
 {
     workqueue_t *wq = (workqueue_t *)arg;
+    int i;
+
+    for (i = 0; i < ARRAY_SIZE(adc_values); i++)
+    {
+        pwmprevs[i] = pwmvals[i];
+        pwmvals[i] = adc_compute_pwmval(*adc_values[i]);
+    }
+
+    adc_state = ADC_STATE_ADJUST;
+    adc_samples++;
+
     workqueue_add(wq, 0);
 }
 
@@ -194,7 +245,6 @@ adc_queue_entry_t adc_queue =
     .complete = adc_complete,
 };
 
-uint32_t pwmvals[ARRAY_SIZE(adc_values)];
 void adc_worker(void *arg);
 workqueue_t adc_wq =
 {
@@ -203,42 +253,62 @@ workqueue_t adc_wq =
 };
 void adc_worker(void *arg)
 {
+    int irqstate = irq_save();
     int i;
 
-    adc_queue.complete_arg = &adc_wq;
-    adc_start(&adc0, &adc_queue);
-
-    for (i = 0; i < ARRAY_SIZE(adc_values); i++)
+    switch (adc_state)
     {
-        volatile int irqstate = irq_save();
-        uint32_t pwmval;
-        float value;
-        float gamma;
+        case ADC_STATE_ADJUST:
+            for (i = 0; i < ARRAY_SIZE(adc_values); i++)
+            {
+                uint32_t value, stepsize;
 
-        switch (current_settings.pwm_mode)
-        {
-            case PWM_MODE_LINEAR:
-                pwmval = (*adc_values[i] * TCC0_MAX) / 10000;  // Convert mV to percent of TCC0_MAX
+                if (pwmvals[i] > pwmprevs[i])
+                {
+                    stepsize = ((pwmvals[i] - pwmprevs[i]) /
+                               current_settings.average_seconds) *
+                               adc_adjust_count;
+                    value = pwmprevs[i] + stepsize;
+                }
+                else
+                {
+                    stepsize = ((pwmprevs[i] - pwmvals[i]) /
+                               current_settings.average_seconds) *
+                               adc_adjust_count;
+                    value = pwmprevs[i] - stepsize;
+                }
+
+                if (adc_adjust_count == (current_settings.average_seconds - 1))
+                {
+                    value = pwmvals[i];
+                }
+
+                tcc_pwm_duty(TCC0, i, value);
+            }
+
+            adc_adjust_count++;
+            if (adc_adjust_count < current_settings.average_seconds)
+            {
+                workqueue_add(&adc_wq, 1);
                 break;
+            }
 
-            case PWM_MODE_GAMMA:
-                value = *adc_values[i] / (float)ADCMAX_mV;  // Convert mV to percent
-                gamma = powf(value, current_settings.pwm_gamma_exponent);
-                pwmval = gamma * TCC0_MAX;
-                break;
+            adc_adjust_count = 0;
+            adc_state = ADC_STATE_SAMPLE;
 
-            default:
-                pwmval = 0;
-                break;
-        }
+            workqueue_add(&adc_wq, 1);
+            break;
 
-        pwmvals[i] = pwmval;
+        case ADC_STATE_SAMPLE:
+            adc_queue.complete_arg = &adc_wq;
+            adc_start(&adc0, &adc_queue);
+            break;
 
-        tcc_pwm_duty(TCC0, i, pwmval);
-
-        irq_restore(irqstate);
+        default:
+            break;
     }
-    
+
+    irq_restore(irqstate);
 }
 
 void status_worker(void *arg);
@@ -276,18 +346,23 @@ void status_worker(void *arg)
 
 int cmd_status(console_t *console, int argc, char *argv[])
 {
+    int irqstate;
+
     if ((argc == 2) && !strcmp(argv[1], "show"))
     {
         int i;
 
         console_print(console, "\r\n");
         console_print(console, "PWM\r\n");
-        console_print(console, "  Mode     : %s\r\n", pwm_modestr[current_settings.pwm_mode]);
-        console_print(console, "  Exponent : %d.%d\r\n", 
+        console_print(console, "  Mode      : %s\r\n", pwm_modestr[current_settings.pwm_mode]);
+        console_print(console, "  Exponent  : %d.%d\r\n", 
                 (int)current_settings.pwm_gamma_exponent,
                 (int)(current_settings.pwm_gamma_exponent * 1000) % 1000);
         console_print(console, "\r\n");
-        console_print(console, "ADC Status:\r\n");
+        console_print(console, "ADC Samples : %ld\r\n", adc_samples);
+        console_print(console, "ADC Average : %d\r\n", current_settings.average_seconds /
+                      SYSTICK_FREQ);
+        console_print(console, "ADC Status  :\r\n");
         for (i = 0; i < ARRAY_SIZE(adc_values); i++)
         {
             int value = *adc_values[i];
@@ -320,6 +395,17 @@ int cmd_status(console_t *console, int argc, char *argv[])
         else if (!strcmp(argv[2], "pwmgamma"))
         {
             current_settings.pwm_gamma_exponent = strtof(argv[3], NULL);
+        }
+        else if (!strcmp(argv[2], "avgsecs"))
+        {
+            current_settings.average_seconds = strtod(argv[3], NULL) * SYSTICK_FREQ;
+
+            irqstate = irq_save();
+            workqueue_remove(&adc_wq);
+            adc_state = ADC_STATE_ADJUST;
+            adc_adjust_count = 0;
+            workqueue_add(&adc_wq, 1);
+            irq_restore(irqstate);
         }
         else
         {
