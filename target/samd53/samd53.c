@@ -35,6 +35,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 
 #include "saml_clocks.h"
@@ -78,11 +79,13 @@ console_t console;
 typedef struct 
 {
     int pwm_mode;
+    float pwm_gamma_exponent;
 } settings_t;
 
 settings_t current_settings =
 {
     .pwm_mode = PWM_MODE_GAMMA,
+    .pwm_gamma_exponent = GAMMA_EXPONENT,
 };
 
 
@@ -114,6 +117,8 @@ cmd_entry_t cmd_table[] =
             "\r\n"
             "  Key/Values:\r\n"
             "    pwmmode    : linear, gamma, disable\r\n"
+            "    pwmgamma   : <exponent value>\r\n"
+            "                 Default exponent value is 2.2\r\n"
     },
     CONSOLE_CMD_USB,
 };
@@ -218,7 +223,7 @@ void adc_worker(void *arg)
 
             case PWM_MODE_GAMMA:
                 value = *adc_values[i] / (float)ADCMAX_mV;  // Convert mV to percent
-                gamma = powf(value, GAMMA_EXPONENT);
+                gamma = powf(value, current_settings.pwm_gamma_exponent);
                 pwmval = gamma * TCC0_MAX;
                 break;
 
@@ -275,8 +280,12 @@ int cmd_status(console_t *console, int argc, char *argv[])
     {
         int i;
 
-        console_print(console, "VBUS  : %s\r\n", port_get(VBUS_PORT, VBUS_PIN) ? "High" : "Low");
-        console_print(console, "PWM   : %s\r\n", pwm_modestr[current_settings.pwm_mode]);
+        console_print(console, "\r\n");
+        console_print(console, "PWM\r\n");
+        console_print(console, "  Mode     : %s\r\n", pwm_modestr[current_settings.pwm_mode]);
+        console_print(console, "  Exponent : %d.%d\r\n", 
+                (int)current_settings.pwm_gamma_exponent,
+                (int)(current_settings.pwm_gamma_exponent * 1000) % 1000);
         console_print(console, "\r\n");
         console_print(console, "ADC Status:\r\n");
         for (i = 0; i < ARRAY_SIZE(adc_values); i++)
@@ -285,6 +294,7 @@ int cmd_status(console_t *console, int argc, char *argv[])
             console_print(console, "  %2d (%05d): %d.%03d, %d\r\n", 
                           i, value, value / 1000, value % 1000, pwmvals[i]);
         }
+        console_print(console, "\r\n");
     }
     else if ((argc == 4) && !strcmp(argv[1], "set"))
     {
@@ -306,6 +316,10 @@ int cmd_status(console_t *console, int argc, char *argv[])
             {
                 cmd_help_usage(console, argv[0]);
             }
+        }
+        else if (!strcmp(argv[2], "pwmgamma"))
+        {
+            current_settings.pwm_gamma_exponent = strtof(argv[3], NULL);
         }
         else
         {

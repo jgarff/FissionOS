@@ -270,6 +270,7 @@ int console_getcmdline(console_t *console, char *newdata, uint32_t len)
                 ((c >= '0') && (c <= '9')) ||
                 (c == 0x7f) || (c == 0x08) ||
                 (c == 0x0d) || (c == 0x0a) ||
+                (c == '.') || (c == ',') ||
                 (c == ' ') || (c == '-'))
             {
                 // Echo all but del/bs/lf/cr
