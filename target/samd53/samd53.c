@@ -261,19 +261,19 @@ void adc_worker(void *arg)
         case ADC_STATE_ADJUST:
             for (i = 0; i < ARRAY_SIZE(adc_values); i++)
             {
-                uint32_t value, stepsize;
+                float value, stepsize;
 
                 if (pwmvals[i] > pwmprevs[i])
                 {
                     stepsize = ((pwmvals[i] - pwmprevs[i]) /
-                               current_settings.average_seconds) *
+                               (float)current_settings.average_seconds) *
                                adc_adjust_count;
                     value = pwmprevs[i] + stepsize;
                 }
                 else
                 {
                     stepsize = ((pwmprevs[i] - pwmvals[i]) /
-                               current_settings.average_seconds) *
+                               (float)current_settings.average_seconds) *
                                adc_adjust_count;
                     value = pwmprevs[i] - stepsize;
                 }
