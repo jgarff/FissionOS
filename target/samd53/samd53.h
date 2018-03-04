@@ -52,11 +52,11 @@
 #define DBG_UART_ID                              0
 #define DBG_UART_GCLK_CORE                       GCLK_SERCOM0_CORE
 #define DBG_UART_PERIPHERAL_ID                   PERIPHERAL_ID_SERCOM0
-#define DBG_UART_PORT                            PORTA
-#define DBG_UART_PORT_TX_PIN                     4
+#define DBG_UART_PORT                            PORTB
+#define DBG_UART_PORT_TX_PIN                     8
 #define DBG_UART_PORT_TX_MUX                     3
 #define DBG_UART_TX_PAD                          SERCOM_USART_CTRLA_TXPO_PAD0
-#define DBG_UART_PORT_RX_PIN                     5
+#define DBG_UART_PORT_RX_PIN                     9
 #define DBG_UART_PORT_RX_MUX                     3
 #define DBG_UART_RX_PAD                          SERCOM_USART_CTRLA_RXPO_PAD1
 
@@ -77,14 +77,14 @@
 #define PWM3_PIN                                 11
 #define PWM_MUX                                  5
 
-#define ADC0_AIN0_PORT                           PORTA
-#define ADC0_AIN0_PIN                            2
-#define ADC0_AIN1_PORT                           PORTA
-#define ADC0_AIN1_PIN                            3
+#define ADC0_AIN0_PORT                           PORTB
+#define ADC0_AIN0_PIN                            0
+#define ADC0_AIN1_PORT                           PORTB
+#define ADC0_AIN1_PIN                            1
 #define ADC0_AIN2_PORT                           PORTB
-#define ADC0_AIN2_PIN                            8
+#define ADC0_AIN2_PIN                            2
 #define ADC0_AIN3_PORT                           PORTB
-#define ADC0_AIN3_PIN                            9
+#define ADC0_AIN3_PIN                            3
 #define ADC_MUX                                  2
 
 #define TCC0_MAX                                 9600   // 5Khz @ 48Mhz reference
@@ -96,9 +96,9 @@
 #define VBUS_MUX                                 0
 #define VBUS_INTNUM                              0
 
-#define OE_PORT                                  PORTA
-#define OE_PIN                                   6
-#define OE_MUX                                   0
+#define PRST_PORT                                PORTB
+#define PRST_PIN                                 17
+#define PRST_MUX                                 0
 
 #define LED_PORT                                 PORTB
 #define LED_PIN                                  10

@@ -54,9 +54,13 @@ static uint32_t usb_config_len;
 
 static volatile uint8_t ctrl0_state = CTRL_STATE_IDLE;  // Global state flags
 static uint16_t vendor_out_expected = 0;
+static uint16_t control_out_expected = 0;
 
 static rx_vendor_setup_t *control0_vendor_setup = NULL;
 static rx_vendor_out_t *control0_vendor_out = NULL;
+
+usb_control0_rx_setup_t *usb_control0_rx_setup = NULL;
+
 
 static char usb_status[2] = { 0, 0 }; // Always return 0 since we are always bus powered.
 
@@ -134,13 +138,11 @@ void control0_rx_setup(usb_endpoint_entry_t *ep)
             usb_txbuffer_start(ep, usb_status, sizeof(usb_status));
             break;
 
-        // CDC ACM state/coding
-        case USB_REQ_SET_CONTROL_LINE_STATE:
-            usb_txbuffer_start(ep, NULL, 0);
-            break;
-
-        case USB_REQ_SET_LINE_CODING:
-            usb_txbuffer_start(ep, NULL, 0);
+        default:
+            if (usb_control0_rx_setup)
+            {
+                control_out_expected = usb_control0_rx_setup(ep, &req);
+            }
             break;
     }
 }

@@ -121,6 +121,27 @@ static usb_endpoint_entry_t usb_serial_data_out =
     .reset      = usb_serial_wakeup,
 };
 
+usb_cdc_line_coding_t line_coding = {};
+uint16_t usb_serial_control(usb_endpoint_entry_t *ep, usb_request_t *req)
+{
+    switch (req->request)
+    {
+        case USB_REQ_SET_CONTROL_LINE_STATE:
+            usb_txbuffer_start(ep, NULL, 0);
+            break;
+
+        case USB_REQ_GET_LINE_CODING:
+            usb_txbuffer_start(ep, (char *)&line_coding, sizeof(line_coding));
+            break;
+
+        case USB_REQ_SET_LINE_CODING:
+            usb_txbuffer_start(ep, NULL, 0);
+            break;
+    }
+
+    return 0;
+}
+
 int usb_serial_send(char *buffer, int len)
 {
     int irqstate = irq_save();
@@ -190,6 +211,9 @@ int usb_serial_init(usb_serial_rx_cb_t rx_callback, void *arg)
 
     usb_endpoint_register(&usb_serial_int);
     usb_endpoint_register(&usb_serial_data_out);
+
+    // Hook the control message callback
+    usb_control0_rx_setup = usb_serial_control;
 
     return 0;
 }

@@ -70,6 +70,7 @@ typedef struct usb_request
 #define USB_REQ_SYNCH_FRAME                      12
 
 #define USB_REQ_SET_LINE_CODING                  32
+#define USB_REQ_GET_LINE_CODING                  33
 #define USB_REQ_SET_CONTROL_LINE_STATE           34
 
     uint8_t value[2];
@@ -187,4 +188,24 @@ typedef struct usb_desc_endpoint
     uint8_t  interval;
 } __attribute__((packed)) usb_desc_endpoint_t;
 
+/*
+ * CDC ADM Line Encoding
+ */
+typedef struct usb_cdc_line_coding
+{
+    uint32_t data_terminal_rate;
+    uint8_t  stop_bits;
+#define USB_CDC_LINE_CODING_STOP_BITS_1          0
+#define USB_CDC_LINE_CODING_STOP_BITS_1_5        1
+#define USB_CDC_LINE_CODING_STOP_BITS_2          2
+    uint8_t  parity;
+#define USB_CDC_LINE_CODING_PARITY_NONE          0
+#define USB_CDC_LINE_CODING_PARITY_ODD           1
+#define USB_CDC_LINE_CODING_PARITY_EVEN          2
+#define USB_CDC_LINE_CODING_PARITY_MARK          3
+#define USB_CDC_LINE_CODING_PARITY_SPACE         4
+    uint8_t  data_bits;
+} __attribute__ ((packed)) usb_cdc_line_coding_t;
+
 #endif /* __USB_MESSAGES_H__ */
+

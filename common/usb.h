@@ -143,6 +143,11 @@ int usb_control0_init(char *desc, uint32_t desc_len,
 
 typedef void (rx_vendor_setup_t)(usb_endpoint_entry_t *, usb_request_t *);
 typedef uint16_t (rx_vendor_out_t)(usb_endpoint_entry_t *);
+typedef uint16_t (usb_control0_rx_setup_t)(usb_endpoint_entry_t *, usb_request_t *);
 void usb_control0_vendor_register(rx_vendor_setup_t *, rx_vendor_out_t *);
 
+extern usb_control0_rx_setup_t *usb_control0_rx_setup;
+
+
 #endif /* __USB_H__ */
+

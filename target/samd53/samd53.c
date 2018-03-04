@@ -147,7 +147,7 @@ uint32_t adc0_ain0_value;
 adc_drv_t adc0_ain0_vsense =
 {
     .value = &adc0_ain0_value,
-    .channel = 0,
+    .channel = 12,
     .calc = adc_calc_divider_12bit_unsigned,
     .calc_arg = (void *)&adc_calc_10_1_divider,
 };
@@ -156,7 +156,7 @@ uint32_t adc0_ain1_value;
 adc_drv_t adc0_ain1_vsense =
 {
     .value = &adc0_ain1_value,
-    .channel = 1,
+    .channel = 13,
     .calc = adc_calc_divider_12bit_unsigned,
     .calc_arg = (void *)&adc_calc_10_1_divider,
 };
@@ -164,7 +164,7 @@ uint32_t adc0_ain2_value;
 adc_drv_t adc0_ain2_vsense =
 {
     .value = &adc0_ain2_value,
-    .channel = 2,
+    .channel = 14,
     .calc = adc_calc_divider_12bit_unsigned,
     .calc_arg = (void *)&adc_calc_10_1_divider,
 };
@@ -172,7 +172,7 @@ uint32_t adc0_ain3_value;
 adc_drv_t adc0_ain3_vsense =
 {
     .value = &adc0_ain3_value,
-    .channel = 3,
+    .channel = 15,
     .calc = adc_calc_divider_12bit_unsigned,
     .calc_arg = (void *)&adc_calc_10_1_divider,
 };
@@ -590,6 +590,13 @@ int main(int argc, char *argv[])
     eic_enable();
 
     //
+    // Hold ethernet in reset
+    //
+    port_peripheral_disable(PRST_PORT, PRST_PIN);
+    port_dir(PRST_PORT, PRST_PIN, 1);
+    port_set(PRST_PORT, PRST_PIN, 0);
+
+    //
     // Setup ADC
     //
     mclk->apbdmask |= MCLK_APBDMASK_ADC0;
@@ -615,13 +622,6 @@ int main(int argc, char *argv[])
     port_peripheral_enable(PWM3_PORT, PWM3_PIN, PWM_MUX);
 
     tcc_pwm_init(TCC0, TCC_CTRLA_PRESCALER_DIV1, 0, TCC0_MAX - 2);
-
-    //
-    // Turn on the output enable
-    //
-    port_peripheral_disable(OE_PORT, OE_PIN);
-    port_dir(OE_PORT, OE_PIN, 1);  // Output
-    port_set(OE_PORT, OE_PIN, 1);  // High
 
     //
     // Setup the USB port
