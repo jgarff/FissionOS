@@ -71,7 +71,7 @@ void stats_init(void)
 void
 stats_display_proto(struct stats_proto *proto, const char *name)
 {
-  LWIP_PLATFORM_DIAG(("\r\n%s\r\n\t", name));
+  LWIP_PLATFORM_DIAG(("\r\n%s\r\n\t", (char *)name));
   LWIP_PLATFORM_DIAG(("xmit: %"STAT_COUNTER_F"\r\n\t", proto->xmit)); 
   LWIP_PLATFORM_DIAG(("recv: %"STAT_COUNTER_F"\r\n\t", proto->recv)); 
   LWIP_PLATFORM_DIAG(("fw: %"STAT_COUNTER_F"\r\n\t", proto->fw)); 

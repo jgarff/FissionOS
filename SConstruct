@@ -134,7 +134,7 @@ at91samd20_env.MergeFlags({
     'OBJPREFIX' : [ 'at91samd20_' ],
 })
 
-atsamd53_env = cortexm0_env.Clone()
+atsamd53_env = cortexm4_env.Clone()
 atsamd53_env.MergeFlags({
     'CFLAGS' : [
         '-D__ATSAMD53__',

@@ -48,13 +48,26 @@
 #include "saml_adc.h"
 #include "saml_power.h"
 #include "saml_arch.h"
+#include "saml_gmac.h"
 
 #include <vectors.h>
 #include <systick.h>
 #include <workqueue.h>
 #include <console.h>
+#include <semaphore.h>
+#include <mailbox.h>
 #include <usb.h>
 #include <adc_calc.h>
+
+#include "lwip/ip.h"
+#include "lwip/ip_addr.h"
+#include "lwip/netif.h"
+#include "lwip/tcpip.h"
+#include "lwip/dhcp.h"
+#include "lwip/stats.h"
+#include "ethernetif.h"
+
+#include "http.h"
 
 #include "usb_config.h"
 #include "usb_serial.h"
@@ -64,6 +77,26 @@
 #include "samd53.h"
 
 #define ADC_ADJUST_MAX                           SYSTICK_FREQ
+
+#define PHY_ADDR                                 0x00
+uint8_t mac_addr[6] = { 0xb8, 0x27, 0xeb, 0x05, 0x45, 0xd5 };
+
+gmac_txbuf_desc_t gmac_txdesc[2];
+uint8_t gmac_txpool[GMAC_TXBUF_SIZE * ARRAY_SIZE(gmac_txdesc)];
+gmac_rxbuf_desc_t gmac_rxdesc[2];
+uint8_t gmac_rxpool[GMAC_RXBUF_SIZE * ARRAY_SIZE(gmac_rxdesc)];
+gmac_drv_t gmac =
+{
+    .txdesc = gmac_txdesc,
+    .txbuf_count = ARRAY_SIZE(gmac_txdesc),
+    .rxdesc = gmac_rxdesc,
+    .rxbuf_count = ARRAY_SIZE(gmac_rxdesc),
+};
+
+/* Network interface global variables */
+static struct ip_addr ipaddr, netmask;
+static struct ip_addr gw;
+
 
 #define ADC_STATE_SAMPLE                         0
 #define ADC_STATE_ADJUST                         1
@@ -99,13 +132,8 @@ settings_t current_settings =
 };
 
 
-//
-// Stub for linking.  Not used without full task support.
-//
-void thread_switch_handler(void)
-{
-}
-
+int cmd_ipstats(console_t *console, int argc, char *argv[]);
+int cmd_threads(console_t *console, int argc, char *argv[]);
 int cmd_status(console_t *console, int argc, char *argv[]);
 //
 // Console Commands
@@ -113,7 +141,12 @@ int cmd_status(console_t *console, int argc, char *argv[]);
 uart_drv_t dbg_uart;
 cmd_entry_t cmd_table[] =
 {
+    CONSOLE_CMD_ETH,
     CONSOLE_CMD_HELP,
+    {
+        .cmdstr = "ip",
+        .callback = cmd_ipstats,
+    },
     CONSOLE_CMD_NVM,
     //CONSOLE_CMD_RESET,
     {
@@ -132,8 +165,19 @@ cmd_entry_t cmd_table[] =
             "    avgsecs    : <seconds>\r\n"
             "                 Number of seconds for light change transisiton\r\n",
     },
+    //{
+    //    .cmdstr = "threads",
+    //    .callback = cmd_threads,
+    //},
     CONSOLE_CMD_USB,
 };
+
+int cmd_ipstats(console_t *console, int argc, char *argv[])
+{
+    stats_display();
+    console_print(console, "\r\n");
+    return 0;
+}
 
 
 adc_desc_t adc0;
@@ -438,6 +482,27 @@ ext_int_t vbus =
     .arg = NULL,
 };
 
+void gmac_link_change_worker(void *arg);
+static workqueue_t link_wq =
+{
+    .callback = gmac_link_change_worker,
+};
+void gmac_link_change_worker(void *arg)
+{
+    if (gmac_link_change_handle())
+    {
+        workqueue_add(&link_wq, SYSTICK_FREQ);
+        return;
+    }
+
+    tcpip_init(NULL, NULL);
+    netif_add(&gmac.netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, tcpip_input);
+    netif_set_default(&gmac.netif);
+    netif_set_up(&gmac.netif);
+
+    dhcp_start(&gmac.netif);
+}
+
 void clock_init(void)
 {
     volatile oscctrl_t *osc = OSCCTRL;
@@ -554,9 +619,11 @@ void clock_init(void)
 int main(int argc, char *argv[])
 {
     volatile mclk_t *mclk = MCLK;
+    volatile int delay = 10000;
 
-    systick_init(GCLK0_HZ);
     clock_init();
+    systick_init(GCLK0_HZ);
+    thread_init();
 
     //
     // Setup the UART
@@ -590,11 +657,46 @@ int main(int argc, char *argv[])
     eic_enable();
 
     //
-    // Hold ethernet in reset
+    // Setup Ethernet Port and Clocks
+    //
+    mclk->ahbmask |= MCLK_AHBMASK_GMAC;
+    mclk->apbcmask |= MCLK_APBCMASK_GMAC;
+
+    port_peripheral_enable(GMAC_GTXCK_PORT, GMAC_GTXCK_PIN, GMAC_MUX);
+    port_peripheral_enable(GMAC_CRS_PORT, GMAC_CRS_PIN, GMAC_MUX);
+    port_peripheral_enable(GMAC_GTXEN_PORT, GMAC_GTXEN_PIN, GMAC_MUX);
+    port_peripheral_enable(GMAC_GTX0_PORT, GMAC_GTX0_PIN, GMAC_MUX);
+    port_peripheral_enable(GMAC_GTX1_PORT, GMAC_GTX1_PIN, GMAC_MUX);
+    port_peripheral_enable(GMAC_GRX0_PORT, GMAC_GRX0_PIN, GMAC_MUX);
+    port_peripheral_enable(GMAC_GRX1_PORT, GMAC_GRX1_PIN, GMAC_MUX);
+    port_peripheral_enable(GMAC_GRXER_PORT, GMAC_GRXER_PIN, GMAC_MUX);
+    port_peripheral_enable(GMAC_MDC_PORT, GMAC_MDC_PIN, GMAC_MUX);
+    port_peripheral_enable(GMAC_MDIO_PORT, GMAC_MDIO_PIN, GMAC_MUX);
+
+    port_strength(GMAC_GTXCK_PORT, GMAC_GTXCK_PIN, PORT_DRIVE_HIGH);
+    port_strength(GMAC_CRS_PORT, GMAC_CRS_PIN, PORT_DRIVE_HIGH);
+    port_strength(GMAC_GTXEN_PORT, GMAC_GTXEN_PIN, PORT_DRIVE_HIGH);
+    port_strength(GMAC_GTX0_PORT, GMAC_GTX0_PIN, PORT_DRIVE_HIGH);
+    port_strength(GMAC_GTX1_PORT, GMAC_GTX1_PIN, PORT_DRIVE_HIGH);
+    port_strength(GMAC_GRX0_PORT, GMAC_GRX0_PIN, PORT_DRIVE_HIGH);
+    port_strength(GMAC_GRX1_PORT, GMAC_GRX1_PIN, PORT_DRIVE_HIGH);
+    port_strength(GMAC_GRXER_PORT, GMAC_GRXER_PIN, PORT_DRIVE_HIGH);
+    port_strength(GMAC_MDC_PORT, GMAC_MDC_PIN, PORT_DRIVE_HIGH);
+    port_strength(GMAC_MDIO_PORT, GMAC_MDIO_PIN, PORT_DRIVE_HIGH);
+
+    //
+    // Release Phy Reset
     //
     port_peripheral_disable(PRST_PORT, PRST_PIN);
     port_dir(PRST_PORT, PRST_PIN, 1);
     port_set(PRST_PORT, PRST_PIN, 0);
+    while (delay)
+    {
+        delay--;
+    }
+    port_set(PRST_PORT, PRST_PIN, 1);
+
+    gmac_init(&gmac, mac_addr, PHY_ADDR, gmac_txpool, gmac_rxpool);
 
     //
     // Setup ADC
@@ -621,7 +723,8 @@ int main(int argc, char *argv[])
     port_peripheral_enable(PWM2_PORT, PWM2_PIN, PWM_MUX);
     port_peripheral_enable(PWM3_PORT, PWM3_PIN, PWM_MUX);
 
-    tcc_pwm_init(TCC0, TCC_CTRLA_PRESCALER_DIV1, 0, TCC0_MAX - 2);
+    // Invert channels 0, 1, 2, and 3 with 0xf
+    tcc_pwm_init(TCC0, TCC_CTRLA_PRESCALER_DIV1, 0xf, TCC0_MAX - 2);
 
     //
     // Setup the USB port
@@ -677,6 +780,9 @@ int main(int argc, char *argv[])
 
     // Start the ADC sampler and PWM generator based on levels
     adc_worker(NULL);
+
+    // Start the ethernet link worker
+    gmac_link_change_worker(NULL);
 
     // Mainloop
     while (1)

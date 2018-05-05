@@ -238,9 +238,6 @@ swd_sam4e_driver_t swd_driver =
     // TODO:  Hook up SWD driver pins
 };
 
-void debug_print(char *fmt, ...)
-{
-}
 
 int main(int argc, char *argv[])
 {

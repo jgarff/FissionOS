@@ -55,6 +55,7 @@ samd53_sources = Split('''
     saml_tcc.c
     saml_adc.c
     saml_port.c
+    saml_gmac.c
 ''')
 
 samd_sources = Split('''

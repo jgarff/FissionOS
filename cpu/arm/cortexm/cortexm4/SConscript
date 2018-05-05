@@ -42,6 +42,7 @@ platforms = [
     [ 'at91sam4s', sources ],
     [ 'at91sam4sd', sources ],
     [ 'at91sam4e', sources ],
+    [ 'atsamd53', sources ],
     [ 'k20', sources ],
 ];
 

@@ -49,8 +49,11 @@
 
 #include <ethernetif.h>
 
-#include "sam4_uart.h"
+#if defined(__AT91SAM4E__)
 #include "sam4_gmac.h"
+#elif defined(__ATSAMD53__)
+#include "saml_gmac.h"
+#endif
 #include "workqueue.h"
 
 #define IFNAME0 'e'

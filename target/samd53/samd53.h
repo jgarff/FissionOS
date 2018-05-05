@@ -100,6 +100,28 @@
 #define PRST_PIN                                 17
 #define PRST_MUX                                 0
 
+#define GMAC_GTXCK_PORT                          PORTA
+#define GMAC_GTXCK_PIN                           14
+#define GMAC_CRS_PORT                            PORTA
+#define GMAC_CRS_PIN                             16
+#define GMAC_GTXEN_PORT                          PORTA
+#define GMAC_GTXEN_PIN                           17
+#define GMAC_GTX0_PORT                           PORTA
+#define GMAC_GTX0_PIN                            18
+#define GMAC_GTX1_PORT                           PORTA
+#define GMAC_GTX1_PIN                            19
+#define GMAC_GRX0_PORT                           PORTA
+#define GMAC_GRX0_PIN                            13
+#define GMAC_GRX1_PORT                           PORTA
+#define GMAC_GRX1_PIN                            12
+#define GMAC_GRXER_PORT                          PORTA
+#define GMAC_GRXER_PIN                           15
+#define GMAC_MDC_PORT                            PORTB
+#define GMAC_MDC_PIN                             14
+#define GMAC_MDIO_PORT                           PORTB
+#define GMAC_MDIO_PIN                            15
+#define GMAC_MUX                                 0xb
+
 #define LED_PORT                                 PORTB
 #define LED_PIN                                  10
 #define LED_MUX                                  6

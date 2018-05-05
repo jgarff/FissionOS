@@ -73,10 +73,17 @@ saml_sources = Split('''
     adc_calc.c
 ''')
 
+samd53_sources = Split('''
+    mailbox.c
+    semaphore.c
+    ethernetif.c
+    http.c
+''')
+
 platforms = [
     [ 'at91saml21', saml_sources ],
     [ 'at91samd20', saml_sources ],
-    [ 'atsamd53', saml_sources ],
+    [ 'atsamd53', saml_sources + samd53_sources],
     [ 'at91sam4s', common_sources ],
     [ 'at91sam4s', common_sources ],
     [ 'at91sam4sd', common_sources ],

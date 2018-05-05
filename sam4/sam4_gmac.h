@@ -40,6 +40,8 @@
 
 #include "lwip/netif.h"
 
+#include "sam4_uart.h"
+
 typedef struct gmac
 {
     uint32_t ncr;
