@@ -126,12 +126,20 @@ at91saml21_env.MergeFlags({
     'OBJPREFIX' : [ 'at91saml21_' ],
 })
 
-at91samd20_env = cortexm0_env.Clone()
-at91samd20_env.MergeFlags({
+atsamd20_env = cortexm0_env.Clone()
+atsamd20_env.MergeFlags({
     'CFLAGS' : [
         '-D__AT91SAMD20__',
     ],
-    'OBJPREFIX' : [ 'at91samd20_' ],
+    'OBJPREFIX' : [ 'atsamd20_' ],
+})
+
+atsamd21_env = cortexm0_env.Clone()
+atsamd21_env.MergeFlags({
+    'CFLAGS' : [
+        '-D__AT91SAMD21__',
+    ],
+    'OBJPREFIX' : [ 'atsamd21_' ],
 })
 
 atsamd53_env = cortexm4_env.Clone()
@@ -175,8 +183,12 @@ targets = {
         'ENV' : at91saml21_env,
         'LIBS' : [],
     },
-    'at91samd20' : {
-        'ENV' : at91samd20_env,
+    'atsamd20' : {
+        'ENV' : atsamd20_env,
+        'LIBS' : [],
+    },
+    'atsamd21' : {
+        'ENV' : atsamd21_env,
         'LIBS' : [],
     },
     'atsamd53' : {

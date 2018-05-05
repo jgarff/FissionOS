@@ -86,11 +86,11 @@ cpu_info = {
         [],
     ],
 
-    'at91samd20' : [
-        'at91samd20',
-        'at91samd20_flash.ld',
+    'atsamd20' : [
+        'atsamd20',
+        'atsamd20_flash.ld',
         Split('''
-            samd/samd_xmodem.c
+            samd20/samd20_xmodem.c
         '''),
     ],
 
@@ -164,8 +164,8 @@ board_info = {
         [],
     ],
 
-    'samd' : [
-        'at91samd20',
+    'samd20' : [
+        'atsamd20',
         Split('''
         '''),
         [],

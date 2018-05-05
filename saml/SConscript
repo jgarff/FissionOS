@@ -71,7 +71,8 @@ samd_sources = Split('''
 
 platforms = [
     [ 'at91saml21', saml_sources ],
-    [ 'at91samd20', samd_sources ],
+    [ 'atsamd20', samd_sources ],
+    [ 'atsamd21', samd_sources ],
     [ 'atsamd53', samd53_sources ],
 ]
 
