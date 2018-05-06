@@ -728,7 +728,7 @@ typedef struct sysctrl
 #define SYSCTRL                                  ((volatile sysctrl_t *)SYSCTRL_BASE)
 
 #define DFLLCTRL_DFLL_COARSE_VAL                 ((*((uint32_t *)0x00806024) >> 26) & 0x3f)
-#define DFLLCTRL_DFLL_FINE_VAL                   0x0
+#define DFLLCTRL_DFLL_FINE_VAL                   0x200
 
 #endif /* __ATSAMD20__ || __ATSAMD21__ */
 

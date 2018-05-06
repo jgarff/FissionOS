@@ -368,7 +368,6 @@ void usb_endpoint_buffer_write(usb_endpoint_entry_t *ep, char *buffer, int len)
     desc->pcksize &= ~(USB_EP_DESC_MULTI_PACKET_SIZE(USB_EP_DESC_MULTI_PACKET_MAX) |
                        USB_EP_DESC_BYTE_COUNT(USB_EP_DESC_MULTI_PACKET_MAX));
     desc->pcksize |= USB_EP_DESC_BYTE_COUNT(len) | USB_EP_DESC_AUTO_ZLP;
-
     barrier();
 
 	// Turn on interrupt and Indicate to hardware that the bank is now ready
@@ -488,6 +487,7 @@ void usb_int_handler(void)
                     // Clear interrupts prior to bank state clear to avoid
                     // interrupt loss
                     write8(&ep_regs->epintflag, USB_EP_EPINTFLAG_TRCPT0);
+                    barrier();
 
                     ep->rx_out(ep);
                 }
@@ -503,6 +503,7 @@ void usb_int_handler(void)
                     // setup data.  The int flag is used for hardware to NAK
                     // setup requests.
                     write8(&ep_regs->epintflag, USB_EP_EPINTFLAG_RXSTP);
+                    barrier();
                 }
             }
 
@@ -513,6 +514,7 @@ void usb_int_handler(void)
                     // Clear interrupts prior to bank state clear to avoid
                     // interrupt loss
                     write8(&ep_regs->epintflag, USB_EP_EPINTFLAG_TRCPT1);
+                    barrier();
 
                     ep->tx_in(ep);
                 }

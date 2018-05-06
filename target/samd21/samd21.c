@@ -87,13 +87,8 @@ void clock_init(void)
     // At 1v8, 3 wait states must be used.
     NVMCTRL->ctrlb = NVMCTRL_CTRLB_MANW | NVMCTRL_CTRLB_RWS(3);
 
-    gclk_setup(GCLK1, GCLK_GENCTRL_SRC_OSCULP32K, 0);
-    gclk_peripheral_enable(GCLK1, GCLK_DFLL48M_REF);
-
-    // Turn on the DLL and wait for ready
-    tmp = SYSCTRL_DFLLCTRL_ENABLE |
-          SYSCTRL_DFLLCTRL_MODE; // |
-          //SYSCTRL_DFLLCTRL_USBCRM;
+    // Turn on the DLL in open mode and wait for ready
+    tmp = SYSCTRL_DFLLCTRL_ENABLE;
     SYSCTRL->dfllctrl = tmp;
     while (!(SYSCTRL->pclksr & SYSCTRL_PCLKSR_DFLLRDY))
         ;
@@ -105,29 +100,28 @@ void clock_init(void)
     while (!(SYSCTRL->pclksr & SYSCTRL_PCLKSR_DFLLRDY))
         ;
 
-    // Setup the coarse step size dfllmul.cstep dfllmul.fstep
-    // Setup the multiplication factor dfllmul.mul
-    //tmp = SYSCTRL->dfllctrl;
-    //SYSCTRL->dfllctrl = tmp;
-    //while (!(SYSCTRL->pclksr & SYSCTRL_PCLKSR_DFLLRDY))
-    //    ;
+    // Switch to the DFLL clock for the main frequency
+    gclk_setup(GCLK0, GCLK_GENCTRL_SRC_DFLL48M, 0);
+}
 
-    tmp = SYSCTRL_DFLLMUL_MUL(48000000 / 32768) |
+void clock_usb(void)
+{
+    volatile uint32_t tmp;
+
+    // Turn on the DLL and wait for ready
+    tmp = SYSCTRL_DFLLCTRL_ENABLE |
+          SYSCTRL_DFLLCTRL_MODE |
+          SYSCTRL_DFLLCTRL_USBCRM;
+    SYSCTRL->dfllctrl = tmp;
+    while (!(SYSCTRL->pclksr & SYSCTRL_PCLKSR_DFLLRDY))
+        ;
+
+    tmp = SYSCTRL_DFLLMUL_MUL(48000000 / 1000) |
           SYSCTRL_DFLLMUL_FSTEP(0xff / 4) |
           SYSCTRL_DFLLMUL_CSTEP(0x1f / 4);
     SYSCTRL->dfllmul = tmp;
     while (!(SYSCTRL->pclksr & (SYSCTRL_PCLKSR_DFLLLCKC | SYSCTRL_PCLKSR_DFLLLCKF)))
         ;
-
-    //tmp = SYSCTRL_DFLLMUL_MUL(48000000 / 1000) |
-    //      SYSCTRL_DFLLMUL_FSTEP(0xff / 4) |
-    //      SYSCTRL_DFLLMUL_CSTEP(0x1f / 4);
-    //SYSCTRL->dfllmul = tmp;
-    //while (!(SYSCTRL->pclksr & (SYSCTRL_PCLKSR_DFLLLCKC | SYSCTRL_PCLKSR_DFLLLCKF)))
-    //    ;
-
-    // Switch to the DFLL clock for the main frequency
-    gclk_setup(GCLK0, GCLK_GENCTRL_SRC_DFLL48M, 0);
 }
 
 
@@ -161,6 +155,8 @@ int main(int argc, char *argv[])
                  NULL);
 
     usb_attach();
+
+    clock_usb();
 
     port_peripheral_disable(LED0_PORT, LED0_PIN);
     port_dir(LED0_PORT, LED0_PIN, 1);

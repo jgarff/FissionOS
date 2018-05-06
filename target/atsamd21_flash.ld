@@ -15,7 +15,6 @@ SECTIONS
 	. = ALIGN(4);
         KEEP(*(.flash_isr_vector))
         *(.text*)
-        *(.rodata*)
     } > flash
 
     . = ALIGN(4);
@@ -27,6 +26,7 @@ SECTIONS
 	. = ALIGN(4);
 	PROVIDE (__data_start = .);
 	KEEP(*(.sram_isr_vector))
+        *(.rodata*)
 	*(.data*)
 	KEEP(*(.sram_function))
         _edata = .;

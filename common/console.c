@@ -87,12 +87,14 @@ int cmd_help_usage(console_t *console, char *command)
         if (!strcmp(command, console->cmd_table[i].cmdstr)) {
             if (console->cmd_table[i].usage) {
                 console_print(console, "\r\nUsage:\r\n");
-                console->send(console->arg, console->cmd_table[i].usage, strlen(console->cmd_table[i].usage));
+                console->send(console->arg, console->cmd_table[i].usage,
+                              strlen(console->cmd_table[i].usage));
                 console_print(console, "\r\n");
             }
             if (console->cmd_table[i].help) {
                 console_print(console, "Description:\r\n");
-                console->send(console->arg, console->cmd_table[i].help, strlen(console->cmd_table[i].help));
+                console->send(console->arg, console->cmd_table[i].help,
+                              strlen(console->cmd_table[i].help));
                 console_print(console, "\r\n");
             }
 
@@ -300,7 +302,6 @@ int console_getcmdline(console_t *console, char *newdata, uint32_t len)
 
                 case 0xd:
                 case 0xa:   // linefeed
-                    console->buffer[console->offset] = 0;
                     goto done;
 
                 default:
