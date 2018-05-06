@@ -1,8 +1,8 @@
 /*
- * saml_tc.c
+ * usb_vendor.h
  *
  *
- * Copyright (c) 2013-2017 Western Digital Corporation or its affiliates.
+ * Copyright (c) 2017 Jeremy Garff
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -28,58 +28,14 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Author: Jeremy Garff <jeremy.garff@sandisk.com>
+ * Author: Jeremy Garff <jer@jers.net>
  *
  */
+#ifndef __USB_VENDOR_H__
+#define __USB_VENDOR_H__
 
 
-#include <stdint.h>
-#include <string.h>
-
-#include <console.h>
-
-#include "saml_tc.h"
+void usb_vendor_init(void);
 
 
-void tc_pwm_init(volatile tc_t *tc, uint32_t prescale_flag,
-                 uint8_t invert)
-{
-    tc->ctrla = TC_CTRLA_SWRST;
-    while (tc->syncbusy)
-        ;
-
-    tc->ctrla = TC_CTRLA_MODE_COUNT16 | prescale_flag;
-    tc->drvctrl = invert ? TC_DRVCTRL_INVEN0 : 0;
-    tc->wave = TC_WAVE_NPWM;
-    tc->dbgctrl = TC_DBGCTRL_DBGRUN;
-
-    while (tc->syncbusy)
-        ;
-
-    tc->ctrla |= TC_CTRLA_ENABLE; // Enable
-}
-
-void tc_disable(volatile tc_t *tc)
-{
-    tc->ctrla &= ~TC_CTRLA_ENABLE;
-}
-
-void tc_pwm_duty(volatile tc_t *tc, int channel, uint16_t duty)
-{
-    if (!channel)
-    {
-        tc->ccbuf0 = duty;
-    }
-    else
-    {
-        tc->ccbuf1 = duty;
-    }
-}
-
-int cmd_tc(console_t *console, int argc, char *argv[])
-{
-    cmd_help_usage(console, argv[0]);
-
-    return 0;
-}
-
+#endif /* __USB_VENDOR_H__ */

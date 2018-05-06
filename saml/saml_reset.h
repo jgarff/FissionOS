@@ -41,7 +41,7 @@
 #include "console.h"
 
 
-#if defined(__AT91SAML21__) || defined(__AT91SAMD20__)
+#if defined(__AT91SAML21__) || defined(__ATSAMD20__) || defined(__ATSAMD21__)
 
 typedef struct reset
 {
@@ -105,7 +105,7 @@ typedef struct reset
 
 int cmd_reset(console_t *console, int argc, char *argv[]);
 
-#endif /* __ATM91SAML21__ || __AT91SAMD20__ */
+#endif /* __ATM91SAML21__ || __ATSAMD20__ || __ATSAMD21__ */
 
 
 #define AIRCR_SYSRESETREQ                        (1 << 2)

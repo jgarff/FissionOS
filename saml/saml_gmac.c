@@ -45,7 +45,7 @@
 #include "lwip/netif.h"
 #include "netif/etharp.h"
 
-#include "saml_arch.h"
+#include "reg.h"
 #include "saml_gmac.h"
 
 

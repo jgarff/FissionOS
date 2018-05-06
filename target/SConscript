@@ -94,6 +94,15 @@ cpu_info = {
         '''),
     ],
 
+    'atsamd21' : [
+        'atsamd21',
+        'atsamd21_flash.ld',
+        Split('''
+              samd21/usb_config.c
+              samd21/usb_vendor.c
+        '''),
+    ],
+
     'atsamd53' : [
         'atsamd53',
         'atsamd53_flash.ld',
@@ -166,6 +175,13 @@ board_info = {
 
     'samd20' : [
         'atsamd20',
+        Split('''
+        '''),
+        [],
+    ],
+
+    'samd21' : [
+        'atsamd21',
         Split('''
         '''),
         [],

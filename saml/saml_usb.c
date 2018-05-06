@@ -35,6 +35,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "reg.h"
 #include "vectors.h"
 #include "usb.h"
 #include "saml_nvm.h"
@@ -193,23 +194,23 @@ void usb_endpoint_register(usb_endpoint_entry_t *ep)
     switch (ep->type)
     {
         case USB_ENDPOINT_TYPE_CONTROL:
-            ep_regs->epcfg = USB_EP_EPCFG_EPTYPE0(USB_EP_EPCFG_EPTYPE0_CTRL_OUT) |
-                             USB_EP_EPCFG_EPTYPE1(USB_EP_EPCFG_EPTYPE1_CTRL_IN);
+            write8(&ep_regs->epcfg, USB_EP_EPCFG_EPTYPE0(USB_EP_EPCFG_EPTYPE0_CTRL_OUT) |
+                             USB_EP_EPCFG_EPTYPE1(USB_EP_EPCFG_EPTYPE1_CTRL_IN));
             break;
 
         case USB_ENDPOINT_TYPE_INT:
-            ep_regs->epcfg = USB_EP_EPCFG_EPTYPE0(USB_EP_EPCFG_EPTYPE0_INT_OUT) |
-                             USB_EP_EPCFG_EPTYPE1(USB_EP_EPCFG_EPTYPE1_INT_IN);
+            write8(&ep_regs->epcfg, USB_EP_EPCFG_EPTYPE0(USB_EP_EPCFG_EPTYPE0_INT_OUT) |
+                             USB_EP_EPCFG_EPTYPE1(USB_EP_EPCFG_EPTYPE1_INT_IN));
             break;
 
         case USB_ENDPOINT_TYPE_BULK:
-            ep_regs->epcfg = USB_EP_EPCFG_EPTYPE0(USB_EP_EPCFG_EPTYPE0_BULK_OUT) |
-                             USB_EP_EPCFG_EPTYPE1(USB_EP_EPCFG_EPTYPE1_BULK_IN);
+            write8(&ep_regs->epcfg, USB_EP_EPCFG_EPTYPE0(USB_EP_EPCFG_EPTYPE0_BULK_OUT) |
+                             USB_EP_EPCFG_EPTYPE1(USB_EP_EPCFG_EPTYPE1_BULK_IN));
             break;
 
         case USB_ENDPOINT_TYPE_ISO:
-            ep_regs->epcfg = USB_EP_EPCFG_EPTYPE0(USB_EP_EPCFG_EPTYPE0_ISO_OUT) |
-                             USB_EP_EPCFG_EPTYPE1(USB_EP_EPCFG_EPTYPE1_ISO_IN);
+            write8(&ep_regs->epcfg, USB_EP_EPCFG_EPTYPE0(USB_EP_EPCFG_EPTYPE0_ISO_OUT) |
+                             USB_EP_EPCFG_EPTYPE1(USB_EP_EPCFG_EPTYPE1_ISO_IN));
             break;
     }
 
@@ -236,7 +237,7 @@ void usb_address_set(uint8_t addr)
  */
 void usb_address_enable(void)
 {
-    USB->dadd = USB_DEVICE_DADD_DADD(usb_addr) | USB_DEVICE_DADD_ADDEN;
+    write8(&USB->dadd, USB_DEVICE_DADD_DADD(usb_addr) | USB_DEVICE_DADD_ADDEN);
 }
 
 /**
@@ -247,7 +248,9 @@ void usb_address_enable(void)
  */
 void usb_attach(void)
 {
-    USB->ctrlb &= ~USB_DEVICE_CTRLB_DETACH;
+    volatile uint16_t ctrlb = USB->ctrlb;
+    ctrlb &= ~USB_DEVICE_CTRLB_DETACH;
+    write16(&USB->ctrlb, ctrlb);
 }
 
 /**
@@ -258,7 +261,9 @@ void usb_attach(void)
  */
 void usb_detach(void)
 {
-    USB->ctrlb |= USB_DEVICE_CTRLB_DETACH;
+    volatile uint16_t ctrlb = USB->ctrlb;
+    ctrlb |= USB_DEVICE_CTRLB_DETACH;
+    write16(&USB->ctrlb, ctrlb);
 }
 
 /**
@@ -268,7 +273,7 @@ void usb_endpoint_rxstp_enable(usb_endpoint_entry_t *ep)
 {
     volatile usb_ep_t *ep_regs = &USB->ep[ep->num];
 
-    ep_regs->epintenset = USB_EP_EPINTENSET_RXSTP;
+    write8(&ep_regs->epintenset, USB_EP_EPINTENSET_RXSTP);
 }
 
 /**
@@ -278,7 +283,7 @@ void usb_endpoint_rxout_enable(usb_endpoint_entry_t *ep)
 {
     volatile usb_ep_t *ep_regs = &USB->ep[ep->num];
 
-    ep_regs->epintenset = USB_EP_EPINTENSET_TRCPT0;
+    write8(&ep_regs->epintenset, USB_EP_EPINTENSET_TRCPT0);
 }
 
 /**
@@ -335,7 +340,7 @@ done:
     barrier();
 
     // Indicate that bank 0 is now ready for next receive
-    ep_regs->epstatusclr = USB_EP_EPSTATUSCLR_BK0RDY;
+    write8(&ep_regs->epstatusclr, USB_EP_EPSTATUSCLR_BK0RDY);
 
     irq_restore(irqstate);
 
@@ -367,8 +372,8 @@ void usb_endpoint_buffer_write(usb_endpoint_entry_t *ep, char *buffer, int len)
     barrier();
 
 	// Turn on interrupt and Indicate to hardware that the bank is now ready
-    ep_regs->epintenset = USB_EP_EPINTENSET_TRCPT1;
-    ep_regs->epstatusset = USB_EP_EPSTATUSSET_BK1RDY;
+    write8(&ep_regs->epintenset, USB_EP_EPINTENSET_TRCPT1);
+    write8(&ep_regs->epstatusset, USB_EP_EPSTATUSSET_BK1RDY);
 }
 
 /**
@@ -463,7 +468,7 @@ void usb_int_handler(void)
     if (USB->intflag & USB_DEVICE_INTFLAG_EORST)
     {
         usb_reset();
-        USB->intflag = USB_DEVICE_INTFLAG_EORST;
+        write16(&USB->intflag, USB_DEVICE_INTFLAG_EORST);
         barrier();
 
         return;
@@ -482,7 +487,7 @@ void usb_int_handler(void)
                 {
                     // Clear interrupts prior to bank state clear to avoid
                     // interrupt loss
-                    ep_regs->epintflag = USB_EP_EPINTFLAG_TRCPT0;
+                    write8(&ep_regs->epintflag, USB_EP_EPINTFLAG_TRCPT0);
 
                     ep->rx_out(ep);
                 }
@@ -497,7 +502,7 @@ void usb_int_handler(void)
                     // Do not clear the interrupt until after we've read the
                     // setup data.  The int flag is used for hardware to NAK
                     // setup requests.
-                    ep_regs->epintflag = USB_EP_EPINTFLAG_RXSTP;
+                    write8(&ep_regs->epintflag, USB_EP_EPINTFLAG_RXSTP);
                 }
             }
 
@@ -507,7 +512,7 @@ void usb_int_handler(void)
                 {
                     // Clear interrupts prior to bank state clear to avoid
                     // interrupt loss
-                    ep_regs->epintflag = USB_EP_EPINTFLAG_TRCPT1;
+                    write8(&ep_regs->epintflag, USB_EP_EPINTFLAG_TRCPT1);
 
                     ep->tx_in(ep);
                 }
@@ -518,15 +523,15 @@ void usb_int_handler(void)
 
 void usb_init(void)
 {
-    USB->descadd = (uint32_t)usb_desc;
+    write32(&USB->descadd, (uint32_t)usb_desc);
 
     // Set the PAD calibration mode
-    USB->padcal = USB_DEVICE_PADCAL_TRANSP(NVM_SOFT_CALIB_USB_TRANSP) |
-                  USB_DEVICE_PADCAL_TRANSN(NVM_SOFT_CALIB_USB_TRANSN) |
-                  USB_DEVICE_PADCAL_TRIM(NVM_SOFT_CALIB_USB_TRIM);
+    write16(&USB->padcal, USB_DEVICE_PADCAL_TRANSP(NVM_SOFT_CALIB_USB_TRANSP) |
+                          USB_DEVICE_PADCAL_TRANSN(NVM_SOFT_CALIB_USB_TRANSN) |
+                          USB_DEVICE_PADCAL_TRIM(NVM_SOFT_CALIB_USB_TRIM));
 
     // Enable the device - Full speed
-    USB->ctrla = USB_DEVICE_CTRLA_ENABLE | USB_DEVICE_CTRLA_RUNSTBY;
+    write8(&USB->ctrla, USB_DEVICE_CTRLA_ENABLE | USB_DEVICE_CTRLA_RUNSTBY);
     while (USB->syncbusy)
         ;
 
@@ -557,10 +562,12 @@ void usb_init(void)
  */
 void usb_fini(void)
 {
-    USB->ctrlb |= USB_DEVICE_CTRLB_DETACH;
+    volatile uint16_t ctrlb = USB->ctrlb;
+    ctrlb |= USB_DEVICE_CTRLB_DETACH;
+    write16(&USB->ctrlb, ctrlb);
 
     // Disable the device
-    USB->ctrla = 0;
+    write8(&USB->ctrla, 0);
     while (USB->syncbusy)
         ;
 }

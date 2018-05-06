@@ -36,6 +36,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "reg.h"
 #include "vectors.h"
 
 #include "systick.h"
@@ -52,14 +53,14 @@ void systick_init(uint32_t clk_freq)
 {
     internal_clk_freq = clk_freq;
 
-    SYST->csr = SYST_CSR_COUNTFLAG | SYST_CSR_CLKSOURCE;
+    write32(&SYST->csr, SYST_CSR_COUNTFLAG | SYST_CSR_CLKSOURCE);
     barrier();
 
-    SYST->rvr = (internal_clk_freq / SYSTICK_FREQ) - 1;
+    write32(&SYST->rvr, (internal_clk_freq / SYSTICK_FREQ) - 1);
     barrier();
 
-    SYST->csr = SYST_CSR_ENABLE | SYST_CSR_TICKINT |
-                SYST_CSR_COUNTFLAG | SYST_CSR_CLKSOURCE;
+    write32(&SYST->csr, SYST_CSR_ENABLE | SYST_CSR_TICKINT |
+            SYST_CSR_COUNTFLAG | SYST_CSR_CLKSOURCE);
 }
 
 void udelay(uint32_t usecs)

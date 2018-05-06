@@ -129,7 +129,7 @@ at91saml21_env.MergeFlags({
 atsamd20_env = cortexm0_env.Clone()
 atsamd20_env.MergeFlags({
     'CFLAGS' : [
-        '-D__AT91SAMD20__',
+        '-D__ATSAMD20__',
     ],
     'OBJPREFIX' : [ 'atsamd20_' ],
 })
@@ -137,7 +137,7 @@ atsamd20_env.MergeFlags({
 atsamd21_env = cortexm0_env.Clone()
 atsamd21_env.MergeFlags({
     'CFLAGS' : [
-        '-D__AT91SAMD21__',
+        '-D__ATSAMD21__',
     ],
     'OBJPREFIX' : [ 'atsamd21_' ],
 })

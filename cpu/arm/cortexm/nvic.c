@@ -37,6 +37,7 @@
 #include <string.h>
 #include <stdint.h>
 
+#include "reg.h"
 #include "systick.h"
 
 #include "vectors.h"
@@ -232,17 +233,17 @@ void nvic_callback_set(int isr, isr_handler callback)
 
 void nvic_enable(int isr)
 {
-    NVIC->iser[isr >> 5] = 1 << (isr & 0x1f);
+    write32(&NVIC->iser[isr >> 5], 1 << (isr & 0x1f));
 }
 
 void nvic_disable(int isr)
 {
-    NVIC->icer[isr >> 5] = 1 << (isr & 0x1f);
+    write32(&NVIC->icer[isr >> 5], 1 << (isr & 0x1f));
 }
 
 void nvic_clear_pending(int isr)
 {
-    NVIC->icpr[isr >> 5] = 1 << (isr & 0x1f);
+    write32(&NVIC->icpr[isr >> 5], 1 << (isr & 0x1f));
 }
 
 uint32_t nvic_isr(void)

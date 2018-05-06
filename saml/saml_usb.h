@@ -128,6 +128,8 @@ typedef struct usb_device
 #define USB_DEVICE_CTRLB_DETACH                  (1 << 0)
 #define USB_DEVICE_CTRLB_UPRSM                   (1 << 1)
 #define USB_DEVICE_CTRLB_SPDCONF(val)            (((val) & 0x3) << 2)
+#define USB_DEVICE_CTRLB_SPDCONF_FS              (0 << 2)
+#define USB_DEVICE_CTRLB_SPDCONF_LS              (1 << 2)
 #define USB_DEVICE_CTRLB_NREPLY                  (1 << 4)
 #define USB_DEVICE_CTRLB_GNAK                    (1 << 9)
 #define USB_DEVICE_CTRLB_LPMHDSK(val)            (((val) & 0x3) << 10)
@@ -229,9 +231,9 @@ typedef struct usb_ep_desc
 #define USB                                      ((volatile usb_device_regs_t *)0x41000000)
 #endif /* __AT91SAML21__ || __ATSAMD53__ */
 
-
-#if defined(__AT91SAMD20__)
-#endif /* __AT91SAMD20__ */
+#if defined(__ATSAMD21__)
+#define USB                                      ((volatile usb_device_regs_t *)0x41005000)
+#endif /* __ATSAMD21__ */
 
 
 int cmd_usb(console_t *console, int argc, char *argv[]);

@@ -35,7 +35,7 @@
 
 #include <stdint.h>
 
-#include "saml_arch.h"
+#include "reg.h"
 #include "saml_clocks.h"
 
 
@@ -70,46 +70,47 @@ void gclk_peripheral_disable(uint8_t clknum, uint8_t peripheral)
 #endif /* __AT91SAML21__ || __ATSAMD53__*/
 
 
-#ifdef __AT91SAMD20__
+#if defined(__ATSAMD20__) || defined(__ATSAMD21__)
 
 void gclk_setup(uint8_t clknum, uint8_t src, uint16_t div)
 {
+    volatile gclk_t *gclk = GCLK;
     volatile uint32_t tmp;  // Use temp for unoptimized compiler
 
     tmp = GCLK_GENDIV_DIV(div) | GCLK_GENDIV_ID(clknum);
-    GCLK->gendiv = tmp;
-    while (GCLK->status)
+    write32(&gclk->gendiv, tmp);
+    while (gclk->status)
         ;
 
     tmp = GCLK_GENCTRL_ID(clknum) |
           GCLK_GENCTRL_SRC(src) |
           GCLK_GENCTRL_OE |
           GCLK_GENCTRL_GENEN;
-    GCLK->genctrl = tmp;
-    while (GCLK->status)
+    write32(&gclk->genctrl, tmp);
+    while (gclk->status)
         ;
 }
 
 void gclk_peripheral_enable(uint8_t clknum, uint8_t peripheral)
 {
+    volatile gclk_t *gclk = GCLK;
     volatile uint16_t tmp;  // Use temp for unoptimized compiles
 
     tmp = GCLK_CLKCTRL_ID(peripheral) | GCLK_CLKCTRL_GEN(clknum) | GCLK_CLKCTRL_CLKEN;
-    GCLK->clkctrl = tmp;
-    while (GCLK->status)
+    write16(&gclk->clkctrl, tmp);
+    while (gclk->status)
         ;
 }
 
 void gclk_peripheral_disable(uint8_t clknum, uint8_t peripheral)
 {
+    volatile gclk_t *gclk = GCLK;
     volatile uint16_t tmp;
 
-    *(uint8_t *)&GCLK->clkctrl = peripheral;
-
-    tmp = GCLK->clkctrl;
-    tmp &= ~GCLK_CLKCTRL_CLKEN;
-
-    GCLK->clkctrl = tmp;
+    tmp = GCLK_CLKCTRL_ID(peripheral) | GCLK_CLKCTRL_GEN(clknum);
+    write16(&GCLK->clkctrl, tmp);
+    while (gclk->status)
+        ;
 }
 
-#endif /* __AT91SAMD20__ */
+#endif /* __ATSAMD20__ */

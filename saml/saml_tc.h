@@ -162,16 +162,18 @@ typedef struct tc
 #define TC7                                      ((volatile tc_t *)0x43001800)
 #endif /* __ATSAMD53__ */
 
-#if defined(__AT91SAMD20__)
+#if defined(__ATSAMD20__)
 #define TC0                                      ((volatile tc_t *)0x42002000)
 #define TC1                                      ((volatile tc_t *)0x42002400)
 #define TC2                                      ((volatile tc_t *)0x42002800)
+#if defined(__ATSAMD20__) || defined(__ATSAMD21__)
 #define TC3                                      ((volatile tc_t *)0x42002c00)
 #define TC4                                      ((volatile tc_t *)0x42003000)
 #define TC5                                      ((volatile tc_t *)0x42003400)
 #define TC6                                      ((volatile tc_t *)0x42003800)
 #define TC7                                      ((volatile tc_t *)0x42003c00)
-#endif /* __AT91SAMD20__ */
+#endif /* __ATSAMD20__ || __ATSAMD21__ */
+#endif /* __ATSAMD20__ */
 
 void tc_pwm_init(volatile tc_t *tc, uint32_t prescale_flag,
                  uint8_t invert);

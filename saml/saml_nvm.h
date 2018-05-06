@@ -38,7 +38,7 @@
 
 #include "console.h"
 
-#if defined(__AT91SAML21__) || defined(__AT91SAMD20__)
+#if defined(__AT91SAML21__) || defined(__ATSAMD20__) || defined(__ATSAMD21__)
 
 typedef struct nvmctrl
 {
@@ -150,15 +150,24 @@ typedef struct nvm_user
 #define NVM_USER_LOCK(val)                       ((val & 0xffff) < 48)
 } __attribute__((packed)) nvm_user_t;
 
-#endif /* defined(__AT91SAML21__) || defined(__AT91SAMD20__) */
+#endif /* defined(__AT91SAML21__) || defined(__ATSAMD20__) || defined(__ATSAMD21__) */
 
-#if defined(__AT91SAML21__) || defined(__AT91SAMD20__)
+#if defined(__AT91SAML21__) || defined(__ATSAMD20__) || defined(__ATSAMD21__)
 #define NVM_USER_ROW                             ((volatile nvm_user_t *)0x00804000)
-#define NVM_SOFT_CALIB                           (*(volatile uint32_t *)0x00806020)
+#define NVM_SOFT_CALIB0                          (*(volatile uint32_t *)0x00806020)
+#define NVM_SOFT_CALIB1                          (*(volatile uint32_t *)0x00806024)
 
-#define NVM_SOFT_CALIB_USB_TRANSN                ((NVM_SOFT_CALIB >> 13) & 0x1f)
-#define NVM_SOFT_CALIB_USB_TRANSP                ((NVM_SOFT_CALIB >> 18) & 0x1f)
-#define NVM_SOFT_CALIB_USB_TRIM                  ((NVM_SOFT_CALIB >> 26) & 0x3f)
+#if defined(__ATSAMD21__)
+#define NVM_SOFT_CALIB_USB_TRANSN                ((NVM_SOFT_CALIB1 >> 13) & 0x1f)
+#define NVM_SOFT_CALIB_USB_TRANSP                ((NVM_SOFT_CALIB1 >> 18) & 0x1f)
+#define NVM_SOFT_CALIB_USB_TRIM                  ((NVM_SOFT_CALIB1 >> 23) & 0x3)
+#endif
+
+#if defined(__AT91SAML21__)
+#define NVM_SOFT_CALIB_USB_TRANSN                ((NVM_SOFT_CALIB0 >> 13) & 0x1f)
+#define NVM_SOFT_CALIB_USB_TRANSP                ((NVM_SOFT_CALIB0 >> 18) & 0x1f)
+#define NVM_SOFT_CALIB_USB_TRIM                  ((NVM_SOFT_CALIB0 >> 26) & 0x3f)
+#endif
 
 // Erases happen on row granularity, programs on page granularity
 #define NVM_PAGE_SIZE                            64

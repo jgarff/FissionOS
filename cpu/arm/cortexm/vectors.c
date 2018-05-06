@@ -35,6 +35,8 @@
 
 #include <stdint.h>
 
+#include "reg.h"
+
 #include "vectors.h"
 
 
@@ -48,12 +50,15 @@ void reset_handler(void)
     volatile uint32_t *src = &__etext, *dst = &__data_start;
     // Change the active stack to the main, but keep priviledged
     uint32_t control = (1 << 1);
+    uint32_t tmp;
 
     // Make sure the stackalign bit is set in the CCR.  This
     // ensures that interrupt/exceptions have properly aligned
     // stack references.  Note:  This only works on Cortex-M3
     // Rev1 and later silicon.
-    SCB->ccr |= CCB_CCR_STKALIGN;
+    tmp = SCB->ccr;
+    tmp |= CCB_CCR_STKALIGN;
+    write32(&SCB->ccr, tmp);
 
     // Set the process stack pointer register.  Note:  The ARM
     // documentation refers to the exception stack as the main
@@ -88,8 +93,7 @@ void reset_handler(void)
 
     // Change the interrupt vector table to that in SRAM so they can be
     // allocated dynamically.
-    SCB->vtor = (uint32_t)&sram_isr_vectors;
-
+    write32(&SCB->vtor, (uint32_t)&sram_isr_vectors);
     ibarrier();
 
     // We can now call main since the stack, data, and bss are ready!

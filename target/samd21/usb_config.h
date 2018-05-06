@@ -1,8 +1,8 @@
 /*
- * saml_tc.c
+ * usb_config.h
  *
  *
- * Copyright (c) 2013-2017 Western Digital Corporation or its affiliates.
+ * Copyright (c) 2017 Jeremy Garff
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -28,58 +28,43 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Author: Jeremy Garff <jeremy.garff@sandisk.com>
+ * Author: Jeremy Garff <jer@jers.net>
  *
  */
 
 
-#include <stdint.h>
-#include <string.h>
+#define USB_SETTLE_mS                            50
 
-#include <console.h>
-
-#include "saml_tc.h"
-
-
-void tc_pwm_init(volatile tc_t *tc, uint32_t prescale_flag,
-                 uint8_t invert)
-{
-    tc->ctrla = TC_CTRLA_SWRST;
-    while (tc->syncbusy)
-        ;
-
-    tc->ctrla = TC_CTRLA_MODE_COUNT16 | prescale_flag;
-    tc->drvctrl = invert ? TC_DRVCTRL_INVEN0 : 0;
-    tc->wave = TC_WAVE_NPWM;
-    tc->dbgctrl = TC_DBGCTRL_DBGRUN;
-
-    while (tc->syncbusy)
-        ;
-
-    tc->ctrla |= TC_CTRLA_ENABLE; // Enable
-}
-
-void tc_disable(volatile tc_t *tc)
-{
-    tc->ctrla &= ~TC_CTRLA_ENABLE;
-}
-
-void tc_pwm_duty(volatile tc_t *tc, int channel, uint16_t duty)
-{
-    if (!channel)
-    {
-        tc->ccbuf0 = duty;
+// String Descriptors referenced from the device descriptor
+#define USB_STR_DESC(name, data, len)                         \
+    usb_desc_string_t name =                                  \
+    {                                                         \
+        .length            = sizeof(usb_desc_string_t) +      \
+                             len,                             \
+        .type              = USB_DESC_TYPE_STRING,            \
+        .buffer            = data                             \
     }
-    else
-    {
-        tc->ccbuf1 = duty;
-    }
-}
 
-int cmd_tc(console_t *console, int argc, char *argv[])
-{
-    cmd_help_usage(console, argv[0]);
+#define USB_MAX_ENDPOINT                         4
 
-    return 0;
-}
+extern usb_desc_string_t *usb_str_desc[];
+extern usb_desc_device_t usb_desc;
+extern uint32_t usb_desc_len;
+
+// Configuration Descriptor
+typedef struct usb_desc_config_all {
+    usb_desc_config_t    config1;
+    usb_desc_interface_t interface1;
+    usb_desc_cdc_header_t header_desc;
+    usb_desc_cdc_acm_t acm_desc;
+    usb_desc_cdc_union_t union_desc;
+    usb_desc_endpoint_t  ep1;
+    usb_desc_interface_t interface2;
+    usb_desc_endpoint_t  ep2;
+    usb_desc_endpoint_t  ep3;
+} __attribute__((packed)) usb_desc_config_all_t;
+
+extern usb_desc_config_all_t usb_config;
+extern uint32_t usb_config_len;
+
 

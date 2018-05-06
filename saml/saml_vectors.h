@@ -69,7 +69,7 @@
 
 #endif /* __AT91SAML21__ */
 
-#ifdef __AT91SAMD20__
+#ifdef __ATSAMD20__
 
 #define PERIPHERAL_ID_PM         0
 #define PERIPHERAL_ID_SYSCTRL    1
@@ -99,7 +99,42 @@
 
 #define ISR_MAX                  25
 
-#endif /* __AT91SAMD20__ */
+#endif /* __ATSAMD20__ */
+
+#ifdef __ATSAMD21__
+
+#define PERIPHERAL_ID_PM         0
+#define PERIPHERAL_ID_SYSCTRL    1 
+#define PERIPHERAL_ID_WDT        2
+#define PERIPHERAL_ID_RTC        3
+#define PERIPHERAL_ID_EIC        4
+#define PERPIHERAL_ID_NVMCTRL    5
+#define PERIPHERAL_ID_DMAC       6
+#define PERIPHERAL_ID_USB        7
+#define PERIPHERAL_ID_EVSYS      8
+#define PERIPHERAL_ID_SERCOM0    9
+#define PERIPHERAL_ID_SERCOM1    10
+#define PERIPHERAL_ID_SERCOM2    11
+#define PERIPHERAL_ID_SERCOM3    12
+#define PERIPHERAL_ID_SERCOM4    13
+#define PERIPHERAL_ID_SERCOM5    14
+#define PERIPHERAL_ID_TCC0       15
+#define PERIPHERAL_ID_TCC1       16
+#define PERIPHERAL_ID_TCC2       17
+#define PERIPHERAL_ID_TC3        18
+#define PERIPHERAL_ID_TC4        19
+#define PERIPHERAL_ID_TC5        20
+#define PERIPHERAL_ID_TC6        21
+#define PERIPHERAL_ID_TC7        22
+#define PERIPHERAL_ID_ADC        23
+#define PERIPHERAL_ID_AC         24
+#define PERIPHERAL_ID_DAC        25
+#define PERIPHERAL_ID_PTC        26
+#define PERIPHERAL_ID_I2S        27
+
+#define ISR_MAX                  28
+
+#endif /* __ATSAMD21__ */
 
 #ifdef __ATSAMD53__
 

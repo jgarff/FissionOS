@@ -1,5 +1,5 @@
 /*
- * saml_tc.c
+ * arch.h
  *
  *
  * Copyright (c) 2013-2017 Western Digital Corporation or its affiliates.
@@ -32,54 +32,38 @@
  *
  */
 
-
-#include <stdint.h>
-#include <string.h>
-
-#include <console.h>
-
-#include "saml_tc.h"
+#ifndef __ARCH_H__
+#define __ARCH_H__
 
 
-void tc_pwm_init(volatile tc_t *tc, uint32_t prescale_flag,
-                 uint8_t invert)
+static inline void write32(volatile uint32_t *addr, uint32_t data)
 {
-    tc->ctrla = TC_CTRLA_SWRST;
-    while (tc->syncbusy)
-        ;
-
-    tc->ctrla = TC_CTRLA_MODE_COUNT16 | prescale_flag;
-    tc->drvctrl = invert ? TC_DRVCTRL_INVEN0 : 0;
-    tc->wave = TC_WAVE_NPWM;
-    tc->dbgctrl = TC_DBGCTRL_DBGRUN;
-
-    while (tc->syncbusy)
-        ;
-
-    tc->ctrla |= TC_CTRLA_ENABLE; // Enable
+    uint32_t tmp = (uint32_t)addr;
+    asm volatile ("str %0, [%1];"
+                  :
+                  : "r"(data), "r"(tmp)
+                  : "r3", "r2"
+                 );
 }
 
-void tc_disable(volatile tc_t *tc)
+static inline void write16(volatile uint16_t *addr, uint16_t data)
 {
-    tc->ctrla &= ~TC_CTRLA_ENABLE;
+    uint32_t tmp = (uint32_t)addr;
+    asm volatile ("mov r3, %1; movs r2, %0; strh r2, [r3];"
+                  :
+                  : "r"(data), "r"(tmp)
+                  : "r3", "r2"
+                 );
 }
 
-void tc_pwm_duty(volatile tc_t *tc, int channel, uint16_t duty)
+static inline void write8(volatile uint8_t *addr, uint8_t data)
 {
-    if (!channel)
-    {
-        tc->ccbuf0 = duty;
-    }
-    else
-    {
-        tc->ccbuf1 = duty;
-    }
+    uint32_t tmp = (uint32_t)addr;
+    asm volatile ("mov r3, %1; mov r2, %0; strb r2, [r3];"
+                  :
+                  : "r"(data), "r"(tmp)
+                  : "r3", "r2"
+                 );
 }
 
-int cmd_tc(console_t *console, int argc, char *argv[])
-{
-    cmd_help_usage(console, argv[0]);
-
-    return 0;
-}
-
+#endif /* __ARCH_H__ */

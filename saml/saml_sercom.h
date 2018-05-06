@@ -133,7 +133,7 @@ typedef volatile struct sercom_usart
 } __attribute__ ((packed)) sercom_usart_t;
 #endif /* __AT91SAML21__ */
 
-#ifdef __AT91SAMD20__
+#if defined(__ATSAMD20__) || defined(__ATSAMD21__)
 typedef volatile struct sercom_usart
 {
     uint32_t ctrla;
@@ -208,7 +208,7 @@ typedef volatile struct sercom_usart
     uint8_t  resvd_0x12[6];
     uint16_t data;
 } __attribute__ ((packed)) sercom_usart_t;
-#endif /* __AT91SAMD20__ */
+#endif /* __ATSAMD20__ || __ATSAMD21__ */
 
 #define UART_RX_BUFFER_SIZE                      8
 
@@ -351,14 +351,22 @@ typedef volatile struct sercom_i2c
 #define SERCOM4_ADDR                             0x42001000
 #define SERCOM5_ADDR                             0x43000400
 #endif /* __AT91SAML21__ */
-#if defined(__AT91SAMD20__)
+#if defined(__ATSAMD20__)
 #define SERCOM0_ADDR                             0x42000800
 #define SERCOM1_ADDR                             0x42000c00
 #define SERCOM2_ADDR                             0x42001000
 #define SERCOM3_ADDR                             0x42001400
 #define SERCOM4_ADDR                             0x42001800
 #define SERCOM5_ADDR                             0x42001c00
-#endif /* __AT91SAMD20__ */
+#endif /* __ATSAMD20__ */
+#if defined(__ATSAMD21__)
+#define SERCOM0_ADDR                             0x42000800
+#define SERCOM1_ADDR                             0x42000c00
+#define SERCOM2_ADDR                             0x42001000
+#define SERCOM3_ADDR                             0x42001400
+#define SERCOM4_ADDR                             0x42001800
+#define SERCOM5_ADDR                             0x42001c00
+#endif /* __ATSAMD21__ */
 #if defined(__ATSAMD53__)
 #define SERCOM0_ADDR                             0x40003000
 #define SERCOM1_ADDR                             0x40003400

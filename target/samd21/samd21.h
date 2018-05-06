@@ -1,8 +1,8 @@
 /*
- * saml_tc.c
+ * samd.h
  *
  *
- * Copyright (c) 2013-2017 Western Digital Corporation or its affiliates.
+ * Copyright (c) 2017 Western Digital Corporation or its affiliates.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -33,53 +33,53 @@
  */
 
 
-#include <stdint.h>
-#include <string.h>
-
-#include <console.h>
-
-#include "saml_tc.h"
+#ifndef __SAMD_H__
+#define __SAMD_H__
 
 
-void tc_pwm_init(volatile tc_t *tc, uint32_t prescale_flag,
-                 uint8_t invert)
+#define GCLK0_HZ                                 48000000
+#define GCLK0                                    0
+#define GCLK1                                    1
+
+#define LED0_PORT                                PORTA
+#define LED0_PIN                                 6
+#define LED1_PORT                                PORTA
+#define LED1_PIN                                 7
+
+#define USB_DP_PORT                              PORTA
+#define USB_DP_PIN                               24
+#define USB_DP_MUX                               6
+
+#define USB_DN_PORT                              PORTA
+#define USB_DN_PIN                               25
+#define USB_DN_MUX                               6
+
+#define BOOTLOADER_SIZE                          (16 * 1024)
+#define FLASH_SIZE_BYTES                         (256 * 1024)
+
+#define BOOTCFG_ADDR                             (FLASH_SIZE_BYTES - (8 * 1024))
+#define BOOTCFG_MAGIC                            0x90187340
+
+
+#define SRAM_ADDR                                0x20000000
+
+
+typedef struct imghdr
 {
-    tc->ctrla = TC_CTRLA_SWRST;
-    while (tc->syncbusy)
-        ;
+    uint32_t stack_ptr;
+    uint32_t start_addr;
+} __attribute__ ((packed)) imghdr_t;
 
-    tc->ctrla = TC_CTRLA_MODE_COUNT16 | prescale_flag;
-    tc->drvctrl = invert ? TC_DRVCTRL_INVEN0 : 0;
-    tc->wave = TC_WAVE_NPWM;
-    tc->dbgctrl = TC_DBGCTRL_DBGRUN;
+#define IMGHDR                                   ((volatile imghdr_t *)BOOTLOADER_SIZE)
 
-    while (tc->syncbusy)
-        ;
 
-    tc->ctrla |= TC_CTRLA_ENABLE; // Enable
-}
-
-void tc_disable(volatile tc_t *tc)
+typedef struct bootcfg
 {
-    tc->ctrla &= ~TC_CTRLA_ENABLE;
-}
+    uint32_t magic;
+    uint32_t len;
+    uint32_t crc;
+    uint32_t resvd_0x0c[13]; // PAD to page size
+} bootcfg_t;
 
-void tc_pwm_duty(volatile tc_t *tc, int channel, uint16_t duty)
-{
-    if (!channel)
-    {
-        tc->ccbuf0 = duty;
-    }
-    else
-    {
-        tc->ccbuf1 = duty;
-    }
-}
 
-int cmd_tc(console_t *console, int argc, char *argv[])
-{
-    cmd_help_usage(console, argv[0]);
-
-    return 0;
-}
-
+#endif /* __SAMD_H__ */

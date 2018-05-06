@@ -32,7 +32,7 @@
  *
  */
 
-#if defined(__AT91SAML21__) || defined(__ATSAMD53__)
+#if defined(__AT91SAML21__) || defined(__ATSAMD53__) || defined(__ATSAMD21__)
 
 #include <stdio.h>
 #include <string.h>

@@ -88,12 +88,12 @@ typedef struct port
 #if defined(__AT91SAML21__)
 #define PORT_BASE                                0x40002800
 #endif /* __AT91SAML21__ */
-#if defined(__AT91SAMD20__)
+#if defined(__ATSAMD20__) || defined(__ATSAMD21__)
 #define PORT_BASE                                0x41004400
-#endif /* __AT91SAMD20__ */
+#endif /* __ATSAMD20__ || __ATSAMD21__ */
 #if defined(__ATSAMD53__)
 #define PORT_BASE                                0x41008000
-#endif /* __AT91SAMD53 */
+#endif /* __ATSAMD53 */
 #define PORT_OFFSET                              0x80
 
 #define PORTA                                    ((volatile port_t *)(PORT_BASE + (PORT_OFFSET * 0)))

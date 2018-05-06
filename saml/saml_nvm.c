@@ -40,11 +40,11 @@
 #include <console.h>
 #include <crc.h>
 
-#include "saml_arch.h"
+#include "reg.h"
 
 #include "saml_nvm.h"
 
-#if defined(__AT91SAML21__) || defined(__AT91SAMD20__)
+#if defined(__AT91SAML21__) || defined(__ATSAMD20__)
 
 static void nvm_busy_wait(void)
 {
@@ -205,7 +205,7 @@ int cmd_nvm(console_t *console, int argc, char *argv[])
     return 0;
 }
 
-#endif /* defined(__AT91SAML21__) || defined(__AT91SAMD20__) */
+#endif /* defined(__AT91SAML21__) || defined(__ATSAMD20__) */
 
 #if defined(__ATSAMD53__)
 

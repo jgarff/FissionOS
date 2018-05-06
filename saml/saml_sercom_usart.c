@@ -51,13 +51,13 @@ void syncbusy_wait(sercom_usart_t *usart)
         ;
 }
 #endif /* __AT91SAML21__ */
-#ifdef __AT91SAMD20__ 
+#if defined(__ATSAMD20__) || defined(__ATSAMD21__)
 void syncbusy_wait(sercom_usart_t *usart)
 {
     while (usart->status & SERCOM_USART_STATUS_SYNCBUSY)
         ;
 }
-#endif /* __AT91SAMD20__ */
+#endif /* __ATSAMD20__ */
 
 static void uart_rxbuf_append(uart_drv_t *uart, uint8_t data)
 {

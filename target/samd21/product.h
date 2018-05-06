@@ -1,8 +1,8 @@
 /*
- * saml_tc.c
+ * product.h
  *
  *
- * Copyright (c) 2013-2017 Western Digital Corporation or its affiliates.
+ * Copyright (c) 2017 Jeremy Garff
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -28,58 +28,39 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Author: Jeremy Garff <jeremy.garff@sandisk.com>
+ * Author: Jeremy Garff <jer@jers.net>
  *
  */
 
 
-#include <stdint.h>
-#include <string.h>
-
-#include <console.h>
-
-#include "saml_tc.h"
+#ifndef __PRODUCT_H__
+#define __PRODUCT_H__
 
 
-void tc_pwm_init(volatile tc_t *tc, uint32_t prescale_flag,
-                 uint8_t invert)
+// We don't have a VID/PID so use something that isn't valid.
+// Unknown is already listed in linux as 0x0011
+#define MANUFACTURER                             { 0x11, 0x00 }
+#define PRODUCT                                  { 0x01, 0x01 }
+#define VERSION                                  { 0x01, 0x00 }
+
+
+/*
+ *  USB transfer types
+ */
+
+/*
+ *  bRequest
+ */
+#define USB_VENDOR_REQUEST_RESET                 0x01   // OUT
+#define USB_VENDOR_REQUEST_INFO                  0x02   // IN
+#define USB_VENDOR_REQUEST_FLASH                 0x03   // OUT
+#define USB_VENDOR_REQUEST_FLASH_DONE            0x04   // OUT
+
+typedef struct
 {
-    tc->ctrla = TC_CTRLA_SWRST;
-    while (tc->syncbusy)
-        ;
+    uint32_t bank;
+    uint32_t size;
+} device_info_t;
 
-    tc->ctrla = TC_CTRLA_MODE_COUNT16 | prescale_flag;
-    tc->drvctrl = invert ? TC_DRVCTRL_INVEN0 : 0;
-    tc->wave = TC_WAVE_NPWM;
-    tc->dbgctrl = TC_DBGCTRL_DBGRUN;
 
-    while (tc->syncbusy)
-        ;
-
-    tc->ctrla |= TC_CTRLA_ENABLE; // Enable
-}
-
-void tc_disable(volatile tc_t *tc)
-{
-    tc->ctrla &= ~TC_CTRLA_ENABLE;
-}
-
-void tc_pwm_duty(volatile tc_t *tc, int channel, uint16_t duty)
-{
-    if (!channel)
-    {
-        tc->ccbuf0 = duty;
-    }
-    else
-    {
-        tc->ccbuf1 = duty;
-    }
-}
-
-int cmd_tc(console_t *console, int argc, char *argv[])
-{
-    cmd_help_usage(console, argv[0]);
-
-    return 0;
-}
-
+#endif /* __PRODUCT_H__ */

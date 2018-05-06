@@ -47,7 +47,7 @@
 #include "saml_tcc.h"
 #include "saml_adc.h"
 #include "saml_power.h"
-#include "saml_arch.h"
+#include "reg.h"
 #include "saml_gmac.h"
 
 #include <vectors.h>

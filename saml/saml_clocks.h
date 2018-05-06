@@ -378,8 +378,7 @@ typedef struct osc32kctrl
 
 #endif /* __AT91SAML21__ */
 
-#ifdef __AT91SAMD20__
-
+#if defined(__ATSAMD20__)
 #define GCLK_DFLL48M_REF                         0
 #define GCLK_WDT                                 1
 #define GCLK_RTC                                 2
@@ -412,7 +411,50 @@ typedef struct osc32kctrl
 #define GCLK_AC_ANALOG                           25
 #define GCLK_DAC                                 26
 #define GCLK_PTC                                 27
+#endif
 
+#if defined(__ATSAMD21__)
+#define GCLK_DFLL48M_REF                         0x0
+#define GCLK_DPLL                                0x1
+#define GCLK_DPLL_32K                            0x2
+#define GCLK_WDT                                 0x3
+#define GCLK_RTC                                 0x4
+#define GCLK_EIC                                 0x5
+#define GCLK_USB                                 0x6
+#define GCLK_EVSYS_CHANNEL_0                     0x7
+#define GCLK_EVSYS_CHANNEL_1                     0x8
+#define GCLK_EVSYS_CHANNEL_2                     0x9
+#define GCLK_EVSYS_CHANNEL_3                     0xa
+#define GCLK_EVSYS_CHANNEL_4                     0xb
+#define GCLK_EVSYS_CHANNEL_5                     0xc
+#define GCLK_EVSYS_CHANNEL_6                     0xd
+#define GCLK_EVSYS_CHANNEL_7                     0xe
+#define GCLK_EVSYS_CHANNEL_8                     0xf
+#define GCLK_EVSYS_CHANNEL_9                     0x10
+#define GCLK_EVSYS_CHANNEL_10                    0x11
+#define GCLK_EVSYS_CHANNEL_11                    0x12
+#define GCLK_SERCOMx_SLOW                        0x13
+#define GCLK_SERCOM0_CORE                        0x14
+#define GCLK_SERCOM1_CORE                        0x15
+#define GCLK_SERCOM2_CORE                        0x16
+#define GCLK_SERCOM3_CORE                        0x17
+#define GCLK_SERCOM4_CORE                        0x18
+#define GCLK_SERCOM5_CORE                        0x19
+#define GCLK_TCC0_TCC1                           0x1a
+#define GCLK_TCC2_TC3                            0x1b
+#define GCLK_TC4_TC5                             0x1c
+#define GCLK_TC6_TC7                             0x1d
+#define GCLK_ADC                                 0x1e
+#define GCLK_AC_DIG                              0x1f
+#define GCLK_AC_ANA                              0x21
+#define GCLK_DAC                                 0x23
+#define GCLK_PTC                                 0x24
+#define GCLK_I2C_0                               0x25
+#define GCLK_I2S_1                               0x26
+
+#endif
+
+#if defined(__ATSAMD20__) || defined(__ATSAMD21__)
 
 typedef struct gclk
 {
@@ -467,9 +509,36 @@ typedef struct pm
 #define PM_APBCSEL_APBCDIV(val)                  ((val & 0x7) << 0)
     uint8_t resvd_0x08[8];
     uint32_t ahbmask;
+#if defined(__ATSAMD21__)
+#define PM_AHBMASK_HPB0                          (1 << 0)
+#define PM_AHBMASK_HPB1                          (1 << 1)
+#define PM_AHBMASK_HPB2                          (1 << 2)
+#define PM_AHBMASK_DSU                           (1 << 3)
+#define PM_AHBMASK_NVMCTRL                       (1 << 4)
+#define PM_AHBMASK_DMAC                          (1 << 5)
+#define PM_AHBMASK_USB                           (1 << 6)
+#endif
     uint32_t apbamask;
+#if defined(__ATSAMD21__)
+#define PM_APBAMASK_PAC0                         (1 << 0)
+#define PM_APBAMASK_PM                           (1 << 1)
+#define PM_APBAMASK_SYSCTRL                      (1 << 2)
+#define PM_APBAMASK_GCLK                         (1 << 3)
+#define PM_APBAMASK_WDT                          (1 << 4)
+#define PM_APBAMASK_RTC                          (1 << 5)
+#define PM_APBAMASK_EIC                          (1 << 6)
+#endif
     uint32_t apbbmask;
+#if defined(__ATSAMD21__)
+#define PM_APBBMASK_PAC1                         (1 << 0)
+#define PM_APBBMASK_DSU                          (1 << 1)
+#define PM_APBBMASK_NVMCTRL                      (1 << 2)
+#define PM_APBBMASK_PORT                         (1 << 3)
+#define PM_APBBMASK_DMAC                         (1 << 4)
+#define PM_APBBMASK_USB                          (1 << 5)
+#endif
     uint32_t apbcmask;
+#if defined(__ATSAMD20__)
 #define PM_APBCMASK_PAC2                         (1 << 0)
 #define PM_APBCMASK_EVSYS                        (1 << 1)
 #define PM_APBCMASK_SERCOM0                      (1 << 2)
@@ -490,6 +559,30 @@ typedef struct pm
 #define PM_APBCMASK_AC                           (1 << 17)
 #define PM_APBCMASK_DAC                          (1 << 18)
 #define PM_APBCMASK_PTC                          (1 << 19)
+#endif
+#if defined(__ATSAMD21__)
+#define PM_APBCMASK_PAC2                         (1 << 0)
+#define PM_APBCMASK_EVSYS                        (1 << 1)
+#define PM_APBCMASK_SERCOM0                      (1 << 2)
+#define PM_APBCMASK_SERCOM1                      (1 << 3)
+#define PM_APBCMASK_SERCOM2                      (1 << 4)
+#define PM_APBCMASK_SERCOM3                      (1 << 5)
+#define PM_APBCMASK_SERCOM4                      (1 << 6)
+#define PM_APBCMASK_SERCOM5                      (1 << 7)
+#define PM_APBCMASK_TCC0                         (1 << 8)
+#define PM_APBCMASK_TCC1                         (1 << 9)
+#define PM_APBCMASK_TCC2                         (1 << 10)
+#define PM_APBCMASK_TC3                          (1 << 11)
+#define PM_APBCMASK_TC4                          (1 << 12)
+#define PM_APBCMASK_TC5                          (1 << 13)
+#define PM_APBCMASK_TC6                          (1 << 14)
+#define PM_APBCMASK_TC7                          (1 << 15)
+#define PM_APBCMASK_ADC                          (1 << 16)
+#define PM_APBCMASK_AC                           (1 << 17)
+#define PM_APBCMASK_DAC                          (1 << 18)
+#define PM_APBCMASK_PTC                          (1 << 19)
+#define PM_APBCMASK_I2S                          (1 << 20)
+#endif
     uint8_t resvd_0x24[16];
     uint8_t intenclr;
 #define PM_INTENCLR_CKRDY                        (1 << 0)
@@ -608,6 +701,7 @@ typedef struct sysctrl
 #define SYSCTRL_DFLLCTRL_MODE                    (1 << 2)
 #define SYSCTRL_DFLLCTRL_STABLE                  (1 << 3)
 #define SYSCTRL_DFLLCTRL_LLAW                    (1 << 4)
+#define SYSCTRL_DFLLCTRL_USBCRM                  (1 << 5)
 #define SYSCTRL_DFLLCTRL_ONDEMAND                (1 << 7)
 #define SYSCTRL_DFLLCTRL_CCDIS                   (1 << 8)
 #define SYSCTRL_DFLLCTRL_QLDIS                   (1 << 9)
@@ -633,8 +727,10 @@ typedef struct sysctrl
 #define SYSCTRL_BASE                             0x40000800
 #define SYSCTRL                                  ((volatile sysctrl_t *)SYSCTRL_BASE)
 
+#define DFLLCTRL_DFLL_COARSE_VAL                 ((*((uint32_t *)0x00806024) >> 26) & 0x3f)
+#define DFLLCTRL_DFLL_FINE_VAL                   0x0
 
-#endif /* __AT91SAMD20__ */
+#endif /* __ATSAMD20__ || __ATSAMD21__ */
 
 #ifdef __ATSAMD53__
 
@@ -1002,7 +1098,6 @@ typedef struct oscctrl
 #define OSCCTRL                                  ((volatile oscctrl_t *)OSCCTRL_BASE)
 
 #define DFLLCTRL_COARSE_VAL                      (*((uint32_t *)0x00806020) >> 26)
-#define DFLLVAL_USB_RECOVERY                     0xbb80
 
 
 typedef struct xosc32k
@@ -1079,7 +1174,7 @@ typedef struct pm
 #define PM                                       ((volatile pm_t *)PM_BASE)
 
 
-#endif /* __AT91SAMD53__ */
+#endif /* __ATSAMD53__ */
 
 
 void gclk_setup(uint8_t clknum, uint8_t src, uint16_t div);
