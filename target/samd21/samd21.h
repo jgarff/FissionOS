@@ -41,8 +41,6 @@
 #define GCLK0                                    0
 #define GCLK1                                    1
 
-#define LED0_PORT                                PORTA
-#define LED0_PIN                                 6
 #define LED1_PORT                                PORTA
 #define LED1_PIN                                 7
 
@@ -53,6 +51,19 @@
 #define USB_DN_PORT                              PORTA
 #define USB_DN_PIN                               25
 #define USB_DN_MUX                               6
+
+#define VBUS_PORT                                PORTA
+#define VBUS_PIN                                 27
+#define VBUS_MUX                                 0
+#define VBUS_INTNUM                              15
+
+#define LED_PORT                                 PORTA
+#define LED_PIN                                  6
+#define LED_MUX                                  4
+#define LED_TCC                                  TCC1
+#define LED_TCC_CHANNEL                          0
+#define STATUS_MAX                               16
+#define LED_TCC_MAX                              (1 << STATUS_MAX)
 
 #define BOOTLOADER_SIZE                          (16 * 1024)
 #define FLASH_SIZE_BYTES                         (256 * 1024)

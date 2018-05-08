@@ -44,6 +44,7 @@
 #include "saml_nvm.h"
 #include "saml_reset.h"
 #include "saml_usb.h"
+#include "saml_tcc.h"
 
 #include <vectors.h>
 #include <systick.h>
@@ -124,6 +125,71 @@ void clock_usb(void)
         ;
 }
 
+void clock_open(void)
+{
+    volatile uint32_t tmp;
+
+    // Turn on the DLL and wait for ready
+    tmp = SYSCTRL_DFLLCTRL_ENABLE;
+    SYSCTRL->dfllctrl = tmp;
+    while (!(SYSCTRL->pclksr & SYSCTRL_PCLKSR_DFLLRDY))
+        ;
+}
+
+
+void vbus_callback(void *arg)
+{
+    if (port_get(VBUS_PORT, VBUS_PIN))
+    {
+        usb_attach();
+        clock_usb();
+    }
+    else
+    {
+        usb_detach();
+        clock_open();
+    }
+}
+
+ext_int_t vbus =
+{
+    .callback = vbus_callback,
+    .arg = NULL,
+};
+
+
+void status_worker(void *arg);
+workqueue_t status_wq =
+{
+    .callback = status_worker,
+    .arg = NULL,
+};
+
+int status_direction = 1;
+int status_value = 0;
+void status_worker(void *arg)
+{
+    if (!status_direction)
+    {
+        status_value--;
+        if (!status_value)
+        {
+            status_direction = 1;
+        }
+    }
+    else
+    {
+        status_value++;
+        if (status_value >= (STATUS_MAX - 1))
+        {
+            status_direction = 0;
+        }
+    }
+
+    tcc_pwm_duty(LED_TCC, LED_TCC_CHANNEL, (status_value * LED_TCC_MAX) / STATUS_MAX); 
+
+    workqueue_add(&status_wq, (SYSTICK_FREQ * (1000 / STATUS_MAX)) / 1000);
+}
 
 //
 // Main initialization
@@ -133,8 +199,6 @@ int main(int argc, char *argv[])
     clock_init();
 
     systick_init(GCLK0_HZ);
-
-    port_peripheral_enable(PORTA, 14, 7);
 
     PM->ahbmask |= PM_AHBMASK_USB;
     PM->apbbmask |= PM_APBBMASK_USB;
@@ -154,14 +218,28 @@ int main(int argc, char *argv[])
                  (console_recv_t)usb_console_recv,
                  NULL);
 
-    usb_attach();
+    //
+    // Setup external interrupts
+    //
+    PM->apbamask |= PM_APBAMASK_EIC;
+    gclk_peripheral_enable(GCLK0, GCLK_EIC);
+    port_peripheral_enable(VBUS_PORT, VBUS_PIN, VBUS_MUX);
+    port_dir(VBUS_PORT, VBUS_PIN, 0);  // Input
 
-    clock_usb();
+    eic_int_setup(VBUS_INTNUM, &vbus, EIC_EDGE_BOTH);
+    eic_int_enable(VBUS_INTNUM);
 
-    port_peripheral_disable(LED0_PORT, LED0_PIN);
-    port_dir(LED0_PORT, LED0_PIN, 1);
-    port_set(LED0_PORT, LED0_PIN, 0);
+    eic_enable();
 
+    // Red LED
+    PM->apbcmask |= PM_APBCMASK_TCC1;
+    gclk_peripheral_enable(GCLK0, GCLK_TCC0_TCC1);
+    port_peripheral_enable(LED_PORT, LED_PIN, LED_MUX);
+    tcc_pwm_init(LED_TCC, TCC_CTRLA_PRESCALER_DIV1,
+                 0, LED_TCC_MAX - 2);
+    status_worker(NULL);
+
+    // Green LED
     port_peripheral_disable(LED1_PORT, LED1_PIN);
     port_dir(LED1_PORT, LED1_PIN, 1);
     port_set(LED1_PORT, LED1_PIN, 0);

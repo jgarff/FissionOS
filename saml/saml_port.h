@@ -247,11 +247,13 @@ typedef struct eic
     uint32_t pinstate;
 } __attribute__ ((packed)) eic_t;
 
-#ifdef __ATSAMD53__
+#if defined(__ATSAMD53__)
 #define EIC_BASE                                 0x40002800
-#else  /* __ATSAMD53__ */
+#elif defined(__AT91SAML21__)
 #define EIC_BASE                                 0x40002400
-#endif /* __ATSAMD53__ */
+#elif defined(__ATSAMD21__) || defined(__ATSAMD20__)
+#define EIC_BASE                                 0x40001800
+#endif
 #define EIC                                      ((volatile eic_t *)EIC_BASE)
 
 

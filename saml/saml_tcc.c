@@ -36,43 +36,62 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <reg.h>
 #include <console.h>
 
 #include "saml_tcc.h"
 
 
 void tcc_pwm_init(volatile tcc_t *tcc, uint32_t prescaler,
-                 uint8_t invertmask, uint16_t period)
+                  uint8_t invertmask, uint16_t period)
 {
-    tcc->ctrla &= ~TCC_CTRLA_ENABLE;
+    volatile uint32_t ctrla = tcc->ctrla;
+    ctrla &= ~TCC_CTRLA_ENABLE;
+    write32(&tcc->ctrla, ctrla);
     while (tcc->syncbusy)
         ;
 
-    tcc->ctrla = TCC_CTRLA_SWRST;
+    write32(&tcc->ctrla, TCC_CTRLA_SWRST);
     while (tcc->syncbusy)
         ;
 
-    tcc->ctrla = TCC_CTRLA_PRESCALER(prescaler) | TCC_CTRLA_PRESYNC_PRESC;
-    tcc->drvctrl = TCC_DRVCTRL_INVMASK(invertmask);
-    tcc->wave = TCC_WAVE_WAVEGEN_NPWM;
-    tcc->dbgctrl = TCC_DBGCTRL_DBGRUN;
-
-    tcc->per = period;
-
+    write32(&tcc->ctrla, TCC_CTRLA_PRESCALER(prescaler) | TCC_CTRLA_PRESYNC_PRESC);
+    while (tcc->syncbusy)
+        ;
+    write32(&tcc->drvctrl, TCC_DRVCTRL_INVMASK(invertmask));
+    while (tcc->syncbusy)
+        ;
+    write32(&tcc->wave, TCC_WAVE_WAVEGEN_NPWM);
+    while (tcc->syncbusy)
+        ;
+    write8(&tcc->dbgctrl, TCC_DBGCTRL_DBGRUN);
+    while (tcc->syncbusy)
+        ;
+    write32(&tcc->per, period);
     while (tcc->syncbusy)
         ;
 
-    tcc->ctrla |= TCC_CTRLA_ENABLE; // Enable
+    ctrla = tcc->ctrla;
+    ctrla |= TCC_CTRLA_ENABLE;
+    write32(&tcc->ctrla, ctrla); // Enable
+    while (tcc->syncbusy)
+        ;
 }
 
 void tcc_disable(volatile tcc_t *tcc)
 {
-    tcc->ctrla &= ~TCC_CTRLA_ENABLE;
+    volatile uint32_t ctrla = tcc->ctrla;
+    ctrla &= ~TCC_CTRLA_ENABLE;
+    write32(&tcc->ctrla, ctrla);
+    while (tcc->syncbusy)
+        ;
 }
 
 void tcc_pwm_duty(volatile tcc_t *tcc, int channel, uint16_t duty)
 {
-    tcc->cc[channel] = duty;
+    write32(&tcc->cc[channel], duty);
+    while (tcc->syncbusy)
+        ;
 }
 
 
