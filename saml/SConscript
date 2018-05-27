@@ -72,6 +72,7 @@ samd20_sources = Split('''
 samd21_sources = Split('''
     saml_clocks.c
     saml_sercom_usart.c
+    saml_sercom_spi.c
     saml_usb.c
     saml_nvm.c
     saml_tc.c

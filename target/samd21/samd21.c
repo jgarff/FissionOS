@@ -134,6 +134,13 @@ void clock_open(void)
     SYSCTRL->dfllctrl = tmp;
     while (!(SYSCTRL->pclksr & SYSCTRL_PCLKSR_DFLLRDY))
         ;
+
+    // Setup the factory tuned coarse correction value
+    tmp = SYSCTRL_DFLLVAL_COARSE(DFLLCTRL_DFLL_COARSE_VAL) |
+          SYSCTRL_DFLLVAL_FINE(DFLLCTRL_DFLL_FINE_VAL);
+    SYSCTRL->dfllval = tmp;
+    while (!(SYSCTRL->pclksr & SYSCTRL_PCLKSR_DFLLRDY))
+        ;
 }
 
 
@@ -191,6 +198,17 @@ void status_worker(void *arg)
     workqueue_add(&status_wq, (SYSTICK_FREQ * (1000 / STATUS_MAX)) / 1000);
 }
 
+spi_drv_t spi_drv;
+
+void spi_test(void)
+{
+    uint8_t txdata[] = { 0x1, 0x0 };
+    uint8_t rxdata[sizeof(txdata)];
+
+    sercom_spi_transfer(&spi_drv, sizeof(txdata), rxdata, txdata, NULL, NULL);
+    sercom_spi_wait(&spi_drv);
+}
+
 //
 // Main initialization
 //
@@ -219,6 +237,23 @@ int main(int argc, char *argv[])
                  NULL);
 
     //
+    // Setup SPI
+    //
+    PM->apbcmask |= PM_APBCMASK_SERCOM3;
+    gclk_peripheral_enable(GCLK0, GCLK_SERCOMx_SLOW);
+    gclk_peripheral_enable(GCLK0, SPI_CLOCK);
+    port_peripheral_enable(SPI_MISO_PORT, SPI_MISO_PIN, SPI_MISO_MUX);
+    port_peripheral_enable(SPI_MOSI_PORT, SPI_MOSI_PIN, SPI_MOSI_MUX);
+    port_peripheral_enable(SPI_SCK_PORT, SPI_SCK_PIN, SPI_SCK_MUX);
+    port_peripheral_disable(SPI_SS_PORT, SPI_SS_PIN);
+    port_dir(SPI_SS_PORT, SPI_SS_PIN, 1);
+    sercom_spi_master_init(SPI_DEVNUM, &spi_drv, SPI_PERIPHERAL,
+                           GCLK0_HZ, SPI_CLOCK_BAUD, 
+                           SPI_SS_PORT, SPI_SS_PIN,
+                           SPI_DIPO, SPI_DOPO,
+                           SPI_FORM);
+
+    //
     // Setup external interrupts
     //
     PM->apbamask |= PM_APBAMASK_EIC;
@@ -242,7 +277,14 @@ int main(int argc, char *argv[])
     // Green LED
     port_peripheral_disable(LED1_PORT, LED1_PIN);
     port_dir(LED1_PORT, LED1_PIN, 1);
-    port_set(LED1_PORT, LED1_PIN, 0);
+    port_set(LED1_PORT, LED1_PIN, 1);
+
+    // RF Reset -- Turn on internal pull-up
+    port_peripheral_disable(RFRST_N_PORT, RFRST_N_PIN);
+    port_dir(RFRST_N_PORT, RFRST_N_PIN, 1);
+    port_set(RFRST_N_PORT, RFRST_N_PIN, 0);
+
+    spi_test();
 
     // Mainloop
     while (1)

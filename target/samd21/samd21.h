@@ -41,6 +41,29 @@
 #define GCLK0                                    0
 #define GCLK1                                    1
 
+#define SPI_DEV                                  SERCOM3_SPI
+#define SPI_CLOCK                                GCLK_SERCOM3_CORE
+#define SPI_CLOCK_BAUD                           1000000
+#define SPI_PERIPHERAL                           PERIPHERAL_ID_SERCOM3
+#define SPI_DEVNUM                               3
+#define SPI_DIPO                                 3
+#define SPI_DOPO                                 0
+#define SPI_FORM                                 0
+#define SPI_MOSI_PORT                            PORTA
+#define SPI_MOSI_PIN                             16
+#define SPI_MOSI_MUX                             3
+#define SPI_SCK_PORT                             PORTA
+#define SPI_SCK_PIN                              17
+#define SPI_SCK_MUX                              3
+#define SPI_MISO_PORT                            PORTA
+#define SPI_MISO_PIN                             19
+#define SPI_MISO_MUX                             3
+#define SPI_SS_PORT                              PORTA
+#define SPI_SS_PIN                               18
+
+#define RFRST_N_PORT                             PORTA
+#define RFRST_N_PIN                              15
+
 #define LED1_PORT                                PORTA
 #define LED1_PIN                                 7
 

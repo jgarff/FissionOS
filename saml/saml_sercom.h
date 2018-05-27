@@ -34,6 +34,8 @@
 #ifndef __SAML_SERCOM_H__
 #define __SAML_SERCOM_H__
 
+#include "saml_port.h"
+
 #include <console.h>
 
 #if defined(__AT91SAML21__) || defined(__ATSAMD53__)
@@ -241,6 +243,102 @@ int uart_recv(uart_drv_t *uart, uint8_t *data, int maxlen);
 void uart_console(console_t *console, uart_drv_t *uart);
 
 
+typedef volatile struct sercom_spi
+{
+    uint32_t ctrla;
+#define SERCOM_SPI_CTRLA_SWRST                   (1 << 0)
+#define SERCOM_SPI_CTRLA_ENABLE                  (1 << 1)
+#define SERCOM_SPI_CTRLA_MODE_SLAVE              (2 << 2)
+#define SERCOM_SPI_CTRLA_MODE_MASTER             (3 << 2)
+#define SERCOM_SPI_CTRLA_RUNSTDBY                (1 << 7)
+#define SERCOM_SPI_CTRLA_IBON                    (1 << 8)
+#define SERCOM_SPI_DOPO(val)                     ((val & 0x3) << 16)
+#define SERCOM_SPI_DIPO(val)                     ((val & 0x3) << 20)
+#define SERCOM_SPI_FORM(val)                     ((val & 0xf) << 24)
+#define SERCOM_SPI_CPHA                          (1 << 28)
+#define SERCOM_SPI_CPOL                          (1 << 29)
+#define SERCOM_SPI_DORD                          (1 << 30)
+    uint32_t ctrlb;
+#define SERCOM_SPI_CTRLB_CHSIZE_8BITS            (0x0 << 0)
+#define SERCOM_SPI_CTRLB_CHSIZE_9BITS            (0x1 << 0)
+#define SERCOM_SPI_CTRLB_CHSIZE_5BITS            (0x5 << 0)
+#define SERCOM_SPI_CTRLB_CHSIZE_6BITS            (0x6 << 0)
+#define SERCOM_SPI_CTRLB_CHSIZE_7BITS            (0x7 << 0)
+#define SERCOM_SPI_CTRLB_PLOADEN                 (1 << 6)
+#define SERCOM_SPI_CTRLB_SSDE                    (1 << 9)
+#define SERCOM_SPI_CTRLB_MSSEN                   (1 << 13)
+#define SERCOM_SPI_CTRLB_AMODE(val)              ((val & 0x3) << 14)
+#define SERCOM_SPI_CTRLB_RXEN                    (1 << 17)
+    uint8_t  resvd_0x08[4];
+    uint8_t  baud;
+    uint8_t  resvd_0x0d[7];
+    uint8_t  intenclr;
+#define SERCOM_SPI_INTENCLR_DRE                  (1 << 0)
+#define SERCOM_SPI_INTENCLR_TXC                  (1 << 1)
+#define SERCOM_SPI_INTENCLR_RXC                  (1 << 2)
+#define SERCOM_SPI_INTENCLR_SSL                  (1 << 3)
+#define SERCOM_SPI_INTENCLR_ERROR                (1 << 7)
+    uint8_t  resvd_0x15;
+    uint8_t  intenset;
+#define SERCOM_SPI_INTENSET_DRE                  (1 << 0)
+#define SERCOM_SPI_INTENSET_TXC                  (1 << 1)
+#define SERCOM_SPI_INTENSET_RXC                  (1 << 2)
+#define SERCOM_SPI_INTENSET_SSL                  (1 << 3)
+#define SERCOM_SPI_INTENSET_ERROR                (1 << 7)
+    uint8_t  resvd_0x17;
+    uint8_t  intflag;
+#define SERCOM_SPI_INTFLAG_DRE                   (1 << 0)
+#define SERCOM_SPI_INTFLAG_TXC                   (1 << 1)
+#define SERCOM_SPI_INTFLAG_RXC                   (1 << 2)
+#define SERCOM_SPI_INTFLAG_SSL                   (1 << 3)
+#define SERCOM_SPI_INTFLAG_ERROR                 (1 << 7)
+    uint8_t  resvd_0x19;
+    uint16_t status;
+#define SERCOM_SPI_STATUS_BUFOVF                 (1 << 2)
+    uint32_t syncbusy;
+#define SERCOM_SPI_SYNCBUSY_SWRST                (1 << 0)
+#define SERCOM_SPI_SYNCBUSY_ENABLE               (1 << 1)
+#define SERCOM_SPI_SYNCBUSY_CTRLB                (1 << 2)
+    uint32_t resvd_0x20;
+    uint32_t addr;
+    uint16_t data;
+    uint8_t  resvd_0x2a[6];
+    uint8_t  dbgctrl;
+#define SERCOM_USART_DBGCTRL_DBGSTOP             (1 << 0)
+} sercom_spi_t;
+
+struct spi_drv;
+typedef void (*spi_callback_t)(struct spi_drv *drv, int len,
+                               uint8_t *rxbuf, uint8_t *txbuf,
+                               void *arg);
+typedef struct spi_drv
+{
+    volatile sercom_spi_t *dev;
+    volatile port_t *ssport;
+    uint8_t sspin;
+    spi_callback_t cb;
+    void *arg;
+    int xferlen;
+    int len;
+    uint8_t *txbuf;
+    uint8_t *rxbuf;
+} spi_drv_t;
+
+spi_drv_t *sercom_spi_master_init(int devnum, spi_drv_t *drv,
+                                  uint8_t peripheral_id,
+                                  uint32_t sysclock, 
+                                  uint32_t baud,
+                                  volatile port_t *ssport,
+                                  uint8_t sspin,
+                                  uint8_t dipo,
+                                  uint8_t dopo,
+                                  int32_t form);
+int sercom_spi_transfer(spi_drv_t *drv, int len,
+                        uint8_t *rxbuf, uint8_t *txbuf,
+                        spi_callback_t cb, void *arg);
+void sercom_spi_wait(spi_drv_t *drv);
+
+
 typedef volatile struct sercom_i2c
 {
     uint32_t ctrla;
@@ -343,6 +441,7 @@ typedef volatile struct sercom_i2c
     uint8_t dbgctrl;
 } __attribute__ ((packed)) sercom_i2c_t;
 
+
 #if defined(__AT91SAML21__)
 #define SERCOM0_ADDR                             0x42000000
 #define SERCOM1_ADDR                             0x42000400
@@ -388,6 +487,13 @@ typedef volatile struct sercom_i2c
 #define SERCOM6_USART                            ((volatile sercom_usart_t *)SERCOM6_ADDR)
 #define SERCOM7_USART                            ((volatile sercom_usart_t *)SERCOM7_ADDR)
 #endif /* __ATSAMD53__ */
+
+#define SERCOM0_SPI                              ((volatile sercom_spi_t *)SERCOM0_ADDR)
+#define SERCOM1_SPI                              ((volatile sercom_spi_t *)SERCOM1_ADDR)
+#define SERCOM2_SPI                              ((volatile sercom_spi_t *)SERCOM2_ADDR)
+#define SERCOM3_SPI                              ((volatile sercom_spi_t *)SERCOM3_ADDR)
+#define SERCOM4_SPI                              ((volatile sercom_spi_t *)SERCOM4_ADDR)
+#define SERCOM5_SPI                              ((volatile sercom_spi_t *)SERCOM5_ADDR)
 
 #define SERCOM0_I2C                              ((volatile sercom_i2c_t *)SERCOM0_ADDR)
 #define SERCOM1_I2C                              ((volatile sercom_i2c_t *)SERCOM1_ADDR)
