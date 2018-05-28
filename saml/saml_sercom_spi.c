@@ -68,7 +68,7 @@ static void sercom_spi_int_handler(spi_drv_t *drv)
     drv->dev->data = drv->txbuf[drv->len];
 }
 
-void sercom_spi_wait(spi_drv_t *drv)
+void spi_wait(spi_drv_t *drv)
 {
     while (drv->len < drv->xferlen)
         ;
@@ -138,7 +138,7 @@ const spi_map_t spi_map[] = {
     },
 };
 
-int sercom_spi_transfer(spi_drv_t *drv, int len,
+int spi_transfer(spi_drv_t *drv, int len,
                         uint8_t *rxbuf, uint8_t *txbuf,
                         spi_callback_t cb, void *arg)
 {
@@ -173,16 +173,16 @@ int sercom_spi_transfer(spi_drv_t *drv, int len,
     return 0;
 }
 
-spi_drv_t *sercom_spi_master_init(int devnum,
-                                  spi_drv_t *drv,
-                                  uint8_t peripheral_id,
-                                  uint32_t sysclock,
-                                  uint32_t baud,
-                                  volatile port_t *ssport,
-                                  uint8_t sspin,
-                                  uint8_t dipo,
-                                  uint8_t dopo,
-                                  int32_t form)
+spi_drv_t *spi_master_init(int devnum,
+                          spi_drv_t *drv,
+                          uint8_t peripheral_id,
+                          uint32_t sysclock,
+                          uint32_t baud,
+                          volatile port_t *ssport,
+                          uint8_t sspin,
+                          uint8_t dipo,
+                          uint8_t dopo,
+                          int32_t form)
 {
     uint32_t ctrla = SERCOM_SPI_CTRLA_IBON |
                      SERCOM_SPI_CTRLA_MODE_MASTER |

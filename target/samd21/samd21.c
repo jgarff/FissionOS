@@ -56,6 +56,8 @@
 #include "usb_serial.h"
 #include "usb_vendor.h"
 
+#include "rfm69hcw.h"
+
 #include "samd21_version.h"
 #include "samd21.h"
 
@@ -68,6 +70,7 @@ console_t console;
 cmd_entry_t cmd_table[] =
 {
     CONSOLE_CMD_HELP,
+    CONSOLE_CMD_RF,
     CONSOLE_CMD_USB,
 };
 
@@ -205,8 +208,8 @@ void spi_test(void)
     uint8_t txdata[] = { 0x1, 0x0 };
     uint8_t rxdata[sizeof(txdata)];
 
-    sercom_spi_transfer(&spi_drv, sizeof(txdata), rxdata, txdata, NULL, NULL);
-    sercom_spi_wait(&spi_drv);
+    spi_transfer(&spi_drv, sizeof(txdata), rxdata, txdata, NULL, NULL);
+    spi_wait(&spi_drv);
 }
 
 //
@@ -237,23 +240,6 @@ int main(int argc, char *argv[])
                  NULL);
 
     //
-    // Setup SPI
-    //
-    PM->apbcmask |= PM_APBCMASK_SERCOM3;
-    gclk_peripheral_enable(GCLK0, GCLK_SERCOMx_SLOW);
-    gclk_peripheral_enable(GCLK0, SPI_CLOCK);
-    port_peripheral_enable(SPI_MISO_PORT, SPI_MISO_PIN, SPI_MISO_MUX);
-    port_peripheral_enable(SPI_MOSI_PORT, SPI_MOSI_PIN, SPI_MOSI_MUX);
-    port_peripheral_enable(SPI_SCK_PORT, SPI_SCK_PIN, SPI_SCK_MUX);
-    port_peripheral_disable(SPI_SS_PORT, SPI_SS_PIN);
-    port_dir(SPI_SS_PORT, SPI_SS_PIN, 1);
-    sercom_spi_master_init(SPI_DEVNUM, &spi_drv, SPI_PERIPHERAL,
-                           GCLK0_HZ, SPI_CLOCK_BAUD, 
-                           SPI_SS_PORT, SPI_SS_PIN,
-                           SPI_DIPO, SPI_DOPO,
-                           SPI_FORM);
-
-    //
     // Setup external interrupts
     //
     PM->apbamask |= PM_APBAMASK_EIC;
@@ -263,8 +249,8 @@ int main(int argc, char *argv[])
 
     eic_int_setup(VBUS_INTNUM, &vbus, EIC_EDGE_BOTH);
     eic_int_enable(VBUS_INTNUM);
-
     eic_enable();
+    vbus_callback(NULL);
 
     // Red LED
     PM->apbcmask |= PM_APBCMASK_TCC1;
@@ -284,7 +270,23 @@ int main(int argc, char *argv[])
     port_dir(RFRST_N_PORT, RFRST_N_PIN, 1);
     port_set(RFRST_N_PORT, RFRST_N_PIN, 0);
 
-    spi_test();
+    //
+    // Setup SPI
+    //
+    PM->apbcmask |= PM_APBCMASK_SERCOM3;
+    gclk_peripheral_enable(GCLK0, GCLK_SERCOMx_SLOW);
+    gclk_peripheral_enable(GCLK0, SPI_CLOCK);
+    port_peripheral_enable(SPI_MISO_PORT, SPI_MISO_PIN, SPI_MISO_MUX);
+    port_peripheral_enable(SPI_MOSI_PORT, SPI_MOSI_PIN, SPI_MOSI_MUX);
+    port_peripheral_enable(SPI_SCK_PORT, SPI_SCK_PIN, SPI_SCK_MUX);
+    port_peripheral_disable(SPI_SS_PORT, SPI_SS_PIN);
+    port_dir(SPI_SS_PORT, SPI_SS_PIN, 1);
+    spi_master_init(SPI_DEVNUM, &spi_drv, SPI_PERIPHERAL,
+                           GCLK0_HZ, SPI_CLOCK_BAUD, 
+                           SPI_SS_PORT, SPI_SS_PIN,
+                           SPI_DIPO, SPI_DOPO,
+                           SPI_FORM);
+    rf69_init(&spi_drv);
 
     // Mainloop
     while (1)

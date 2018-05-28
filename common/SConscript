@@ -71,6 +71,7 @@ saml_sources = Split('''
     usb_control0.c
     usb_serial.c
     adc_calc.c
+    rfm69hcw.c
 ''')
 
 samd53_sources = Split('''

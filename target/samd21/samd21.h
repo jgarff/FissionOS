@@ -43,7 +43,7 @@
 
 #define SPI_DEV                                  SERCOM3_SPI
 #define SPI_CLOCK                                GCLK_SERCOM3_CORE
-#define SPI_CLOCK_BAUD                           1000000
+#define SPI_CLOCK_BAUD                           5000000
 #define SPI_PERIPHERAL                           PERIPHERAL_ID_SERCOM3
 #define SPI_DEVNUM                               3
 #define SPI_DIPO                                 3

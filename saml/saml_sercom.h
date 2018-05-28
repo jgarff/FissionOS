@@ -324,19 +324,20 @@ typedef struct spi_drv
     uint8_t *rxbuf;
 } spi_drv_t;
 
-spi_drv_t *sercom_spi_master_init(int devnum, spi_drv_t *drv,
-                                  uint8_t peripheral_id,
-                                  uint32_t sysclock, 
-                                  uint32_t baud,
-                                  volatile port_t *ssport,
-                                  uint8_t sspin,
-                                  uint8_t dipo,
-                                  uint8_t dopo,
-                                  int32_t form);
-int sercom_spi_transfer(spi_drv_t *drv, int len,
-                        uint8_t *rxbuf, uint8_t *txbuf,
-                        spi_callback_t cb, void *arg);
-void sercom_spi_wait(spi_drv_t *drv);
+spi_drv_t *spi_master_init(int devnum,
+                          spi_drv_t *drv,
+                          uint8_t peripheral_id,
+                          uint32_t sysclock,
+                          uint32_t baud,
+                          volatile port_t *ssport,
+                          uint8_t sspin,
+                          uint8_t dipo,
+                          uint8_t dopo,
+                          int32_t form);
+int spi_transfer(spi_drv_t *drv, int len,
+                 uint8_t *rxbuf, uint8_t *txbuf,
+                 spi_callback_t cb, void *arg);
+void spi_wait(spi_drv_t *drv);
 
 
 typedef volatile struct sercom_i2c
