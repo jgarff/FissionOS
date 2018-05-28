@@ -46,7 +46,6 @@
 #define SPI_STATE_BUSY                           1
 
 static spi_drv_t *spi_drv[SERCOM_COUNT];
-static int spi_state = SPI_STATE_IDLE;
 
 void spibusy_wait(sercom_spi_t *dev)
 {
@@ -60,7 +59,7 @@ static void sercom_spi_int_handler(spi_drv_t *drv)
     if (drv->len >= drv->xferlen)
     {
         port_set(drv->ssport, drv->sspin, 1);
-        spi_state = SPI_STATE_IDLE;
+        drv->state = SPI_STATE_IDLE;
 
         if (drv->cb)
         {
@@ -149,13 +148,13 @@ int spi_transfer(spi_drv_t *drv, int len,
 {
     uint32_t irq_state = irq_save();
 
-    if (spi_state != SPI_STATE_IDLE)
+    if (drv->state != SPI_STATE_IDLE)
     {
         irq_restore(irq_state);
         return -1;
     }
 
-    spi_state = SPI_STATE_BUSY;
+    drv->state = SPI_STATE_BUSY;
 
     irq_restore(irq_state);
 
@@ -176,7 +175,7 @@ int spi_transfer(spi_drv_t *drv, int len,
     else
     {
         port_set(drv->ssport, drv->sspin, 1);
-        spi_state = SPI_STATE_IDLE;
+        drv->state = SPI_STATE_IDLE;
 
         if (drv->cb)
         {
@@ -209,6 +208,7 @@ spi_drv_t *spi_master_init(int devnum,
     spi_drv[devnum] = drv;
     drv->dev = spi_map[devnum].dev;
 
+    drv->state = SPI_STATE_IDLE;
     drv->ssport = ssport;
     drv->sspin = sspin;
 

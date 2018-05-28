@@ -314,6 +314,7 @@ typedef void (*spi_callback_t)(struct spi_drv *drv, int len,
 typedef struct spi_drv
 {
     volatile sercom_spi_t *dev;
+    volatile int state;
     volatile port_t *ssport;
     uint8_t sspin;
     spi_callback_t cb;
