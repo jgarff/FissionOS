@@ -210,7 +210,7 @@ static inline void port_peripheral_disable(volatile port_t *port, uint32_t pin)
     port->pincfg[pin] &= ~PORT_PINCFG_PMUXEN;
 }
 
-
+#if defined(__ATSAMD53__) || defined(__AT91SAML21__)
 typedef struct eic
 {
     uint8_t  ctrla;
@@ -246,6 +246,38 @@ typedef struct eic
     uint32_t dprescaler;
     uint32_t pinstate;
 } __attribute__ ((packed)) eic_t;
+#endif // defined(__ATSAMD53__) || defined(__AT91SAML21__)
+
+#if defined(__ATSAMD21__) || defined(__ATSAMD20__)
+typedef struct eic
+{
+    uint8_t  ctrla;
+#define EIC_CTRLA_SWRST                          (1 << 0)
+#define EIC_CTRLA_ENABLE                         (1 << 1)
+    uint8_t  status;
+#define EIC_CTRLA_SYNCBUSY                       (1 << 7)
+    uint8_t  nmictrl;
+#define EIC_NMICTRL_NMISENSE(val)                (((val) & 0x7) << 0)
+#define EIC_NMICTRL_NMIFILTEN                    (1 << 3)
+    uint8_t  nmiflag;
+#define EIC_NMIFLAG_NMI                          (1 << 0)
+    uint32_t evctrl;
+#define EIC_EVCTRL_EXTINTEO(val)                 (1 << val)
+    uint32_t intenclr;
+#define EIC_INTENCLR_EXTINT(val)                 (1 << val)
+    uint32_t intenset;
+#define EIC_INTENSET_EXTINT(val)                 (1 << val)
+    uint32_t intflag;
+#define EIC_INTFLAG_EXTINT(val)                  (1 << val)
+    uint32_t wakeup;
+#define EIC_WAKEUP_WAKEUPEN(val)                 (1 << val)
+    uint32_t confign0;
+    uint32_t confign1;
+#define EIC_CONFIG_SENSE_MASK(n)                 (0x7 << (n << 2))
+#define EIC_CONFIG_SENSE(n, val)                 (((val) & 0x7) << (n << 2))
+#define EIC_CONFIG_FILT(n)                       ((1 << 3) << (n << 2))
+} __attribute__ ((packed)) eic_t;
+#endif // defined(__ATSAMD21__) || defined(__ATSAMD20__)
 
 #if defined(__ATSAMD53__)
 #define EIC_BASE                                 0x40002800
@@ -281,7 +313,7 @@ static inline void eic_sense(uint8_t intnum, uint8_t type)
     config = &EIC->confign0;
     if (intnum > 7)
     {
-        config = &EIC->confign0;
+        config = &EIC->confign1;
         index = intnum - 8;
     }
 

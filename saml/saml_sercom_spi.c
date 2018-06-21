@@ -53,18 +53,37 @@ void spibusy_wait(sercom_spi_t *dev)
         ;
 }
 
+static void spi_wq_handler(void *arg)
+{
+    spi_drv_t *drv = (spi_drv_t *)arg;
+
+    if (drv->cb)
+    {
+        drv->cb(drv, drv->len, drv->rxbuf, drv->txbuf, drv->arg);
+    }
+}
+
 static void sercom_spi_int_handler(spi_drv_t *drv)
 {
-    drv->rxbuf[drv->len++] = drv->dev->data;
+    if (drv->rxbuf)
+    {
+        drv->rxbuf[drv->len] = drv->dev->data;
+    }
+    else
+    {
+        (void)drv->dev->data;
+    }
+    drv->len++;
+
     if (drv->len >= drv->xferlen)
     {
         port_set(drv->ssport, drv->sspin, 1);
         drv->state = SPI_STATE_IDLE;
 
-        if (drv->cb)
-        {
-            drv->cb(drv, drv->len, drv->rxbuf, drv->txbuf, drv->arg);
-        }
+        // Issue callback in non-interrupt context
+        drv->wq.callback = spi_wq_handler;
+        drv->wq.arg = drv;
+        workqueue_add(&drv->wq, 0);
 
         return;
     }

@@ -88,6 +88,11 @@
 #define STATUS_MAX                               16
 #define LED_TCC_MAX                              (1 << STATUS_MAX)
 
+#define DIO0_PORT                                PORTA
+#define DIO0_PIN                                 9
+#define DIO0_INTNUM                              9
+#define DIO0_MUX                                 0
+
 #define BOOTLOADER_SIZE                          (16 * 1024)
 #define FLASH_SIZE_BYTES                         (256 * 1024)
 

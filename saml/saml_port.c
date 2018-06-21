@@ -83,8 +83,16 @@ void eic_enable(void)
 #endif /* __ATSAMD53__ */
 
     eic->ctrla = EIC_CTRLA_ENABLE;
+#if defined(__ATSAMD53__) || defined(__AT91SAML21__)
     while (eic->syncbusy)
         ;
+#endif // defined(__ATSAMD53__) || defined(__AT91SAML21__)
+
+#if defined(__ATSAMD20__) || defined(__ATSAMD21__)
+    while (eic->status)
+        ;
+#endif // defined(__ATSAMD53__) || defined(__AT91SAML21__)
+
 
 #if defined(__ATSAMD53__)
     for (i = 0; i < EIC_INTS_MAX; i++)

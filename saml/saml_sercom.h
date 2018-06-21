@@ -316,6 +316,7 @@ typedef struct spi_drv
     volatile sercom_spi_t *dev;
     volatile int state;
     volatile port_t *ssport;
+    workqueue_t wq;
     uint8_t sspin;
     spi_callback_t cb;
     void *arg;

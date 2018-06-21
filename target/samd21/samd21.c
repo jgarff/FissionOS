@@ -64,6 +64,9 @@
 
 extern uint32_t __config_word;
 
+#define RFFREECOUNT                              8
+rfbuf_t rfbufs[RFFREECOUNT];
+rf69_spi_pkt_t rfpktbufs[RFFREECOUNT];
 
 console_t console;
 
@@ -203,14 +206,125 @@ void status_worker(void *arg)
 
 spi_drv_t spi_drv;
 
-void spi_test(void)
-{
-    uint8_t txdata[] = { 0x1, 0x0 };
-    uint8_t rxdata[sizeof(txdata)];
+uint8_t rssiconfig[] = { RFM69_REG_RSSICONFIG_START };
+uint8_t rxbw[] = { RFM69_REG_RXBW_DCC_FREQ(0x2) | RFM69_REG_RXBW_MANT(0x2) |
+                   RFM69_REG_RXBW_EXP(0x5)};
+uint8_t afcbw[] = { RFM69_REG_AFCBW_DCC_FREQ(0x4) | RFM69_REG_AFCBW_MANT(0x1) |
+                    RFM69_REG_AFCBW_EXP(0x3)};
+uint8_t diomapping2[] = { RFM69_REG_DIOMAPPING2_CLKOUT_OFF };
+uint8_t rssithresh[] = { 0xe4 };
+uint8_t syncvalue[] = RF69_NETWORK_ID;
+uint8_t fifothresh[] = { RFM69_REG_FIFOTHRESH_TXSTARTCONDITION |
+                         RFM69_REG_FIFOTHRESH_FIFOTHRESHOLD(0xf) };
+uint8_t testdagc[] = { 0x30 };
+uint8_t lna[] = { RFM69_REG_LNA_ZIN };
+uint8_t packetconfig1[] = { RFM69_REG_PACKETCONFIG1_PACKETFORMAT | 
+                          RFM69_REG_PACKETCONFIG1_DCFREE_WHITEN |
+                          RFM69_REG_PACKETCONFIG1_CRCON |
+                          RFM69_REG_PACKETCONFIG1_ADDR_NODEBCAST };
 
-    spi_transfer(&spi_drv, sizeof(txdata), rxdata, txdata, NULL, NULL);
-    spi_wait(&spi_drv);
+rf69_reg_init_t rf69_regs[] = {
+    {
+        .addr = RFM69_REG_RXBW,
+        .data = rxbw,
+        .len = sizeof(rxbw),
+    },
+    {
+        .addr = RFM69_REG_AFCBW,
+        .data = afcbw,
+        .len = sizeof(afcbw),
+    },
+    {
+        .addr = RFM69_REG_DIOMAPPING2,
+        .data = diomapping2,
+        .len = sizeof(diomapping2),
+    },
+    {
+        .addr = RFM69_REG_RSSITHRESH,
+        .data = rssithresh,
+        .len = sizeof(rssithresh),
+    },
+    {
+        .addr = RFM69_REG_SYNCVALUE,
+        .data = syncvalue,
+        .len = sizeof(syncvalue),
+    },
+    {
+        .addr = RFM69_REG_FIFOTHRESH,
+        .data = fifothresh,
+        .len = sizeof(fifothresh),
+    },
+    {
+        .addr = RFM69_REG_TESTDAGC,
+        .data = testdagc,
+        .len = sizeof(testdagc),
+    },
+    {
+        .addr = RFM69_REG_LNA,
+        .data = lna,
+        .len = sizeof(lna),
+    },
+    {
+        .addr = RFM69_REG_PACKETCONFIG1,
+        .data = packetconfig1,
+        .len = sizeof(packetconfig1),
+    },
+};
+
+void rf_worker(void *arg);
+workqueue_t rf_wq = {
+    .callback = rf_worker,
+    .arg = NULL,
+};
+
+#define RF_WORKER_RESET                          0
+#define RF_WORKER_RESET_DONE                     1
+#define RF_WORKER_INIT                           2
+#define RF_WORKER_TX                             3
+int rf_worker_state = RF_WORKER_RESET;
+void rf_worker(void *arg)
+{
+    switch (rf_worker_state)
+    {
+        case RF_WORKER_RESET:
+            port_set(RFRST_N_PORT, RFRST_N_PIN, 1);
+            rf_worker_state++;
+            break;
+
+        case RF_WORKER_RESET_DONE:
+            port_set(RFRST_N_PORT, RFRST_N_PIN, 0);
+            rf_worker_state++;
+            break;
+
+        case RF_WORKER_INIT:
+            rf69_regs_init(&spi_drv, rf69_regs, ARRAY_SIZE(rf69_regs));
+            rf_worker_state++;
+            break;
+
+        case RF_WORKER_TX:
+            rf69_tx(&spi_drv, RF69_BROADCAST_ADDR, 1, 0, 0, NULL, 0, NULL, NULL);
+            workqueue_add(&rf_wq, SYSTICK_FREQ / 10);
+            return;
+
+        default:
+            return;
+    }
+
+
+    workqueue_add(&rf_wq, SYSTICK_FREQ);
 }
+
+void dio0_cb(void *arg)
+{
+    rf69_dio0_int(&spi_drv);
+}
+
+ext_int_t dio0 =
+{
+    .callback = dio0_cb,
+    .arg = NULL,
+
+};
 
 //
 // Main initialization
@@ -238,19 +352,6 @@ int main(int argc, char *argv[])
                  (console_send_t)usb_console_send_wait, 
                  (console_recv_t)usb_console_recv,
                  NULL);
-
-    //
-    // Setup external interrupts
-    //
-    PM->apbamask |= PM_APBAMASK_EIC;
-    gclk_peripheral_enable(GCLK0, GCLK_EIC);
-    port_peripheral_enable(VBUS_PORT, VBUS_PIN, VBUS_MUX);
-    port_dir(VBUS_PORT, VBUS_PIN, 0);  // Input
-
-    eic_int_setup(VBUS_INTNUM, &vbus, EIC_EDGE_BOTH);
-    eic_int_enable(VBUS_INTNUM);
-    eic_enable();
-    vbus_callback(NULL);
 
     // Red LED
     PM->apbcmask |= PM_APBCMASK_TCC1;
@@ -286,7 +387,39 @@ int main(int argc, char *argv[])
                            SPI_SS_PORT, SPI_SS_PIN,
                            SPI_DIPO, SPI_DOPO,
                            SPI_FORM);
-    rf69_init(&spi_drv);
+    rf69_init(&spi_drv, rfbufs, rfpktbufs, ARRAY_SIZE(rfbufs));
+
+    //
+    // Setup RF external interrupt
+    //
+    PM->apbamask |= PM_APBAMASK_EIC;
+    gclk_peripheral_enable(GCLK0, GCLK_EIC);
+    port_peripheral_enable(DIO0_PORT, DIO0_PIN, DIO0_MUX);
+    port_dir(DIO0_PORT, DIO0_PIN, 0);
+    eic_int_setup(DIO0_INTNUM, &dio0, EIC_EDGE_RISE);
+    eic_int_enable(DIO0_INTNUM);
+
+    //
+    // Setup external interrupts
+    //
+    gclk_peripheral_enable(GCLK0, GCLK_EIC);
+    port_peripheral_enable(VBUS_PORT, VBUS_PIN, VBUS_MUX);
+    port_dir(VBUS_PORT, VBUS_PIN, 0);  // Input
+
+    eic_int_setup(VBUS_INTNUM, &vbus, EIC_EDGE_BOTH);
+    eic_int_enable(VBUS_INTNUM);
+
+    eic_enable();
+
+    //
+    // Check for USB voltage
+    //
+    vbus_callback(NULL);
+
+    //
+    // Start radio processing
+    //
+    rf_worker(NULL);
 
     // Mainloop
     while (1)
