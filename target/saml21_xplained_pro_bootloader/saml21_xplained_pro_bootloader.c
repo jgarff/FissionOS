@@ -55,6 +55,8 @@
 #include "saml_xmodem.h"
 
 
+volatile uint32_t *reset_config = RESET_CONFIG;
+
 console_t console;
 extern uint32_t __config_word;
 
@@ -110,7 +112,7 @@ int bootloader_active(void)
     // TODO:  Should test a GPIO for forcing bootloader mode
 
     if ((RESET->rcause & RESET_RCAUSE_SYST) &&
-        (RESET_CONFIG == RESET_CONFIG_BOOTLOADER))
+        (*reset_config == RESET_CONFIG_BOOTLOADER))
     {
         return 1;
     }
@@ -122,7 +124,7 @@ void application_start(void)
 {
     bootcfg_t *bootcfg = (bootcfg_t *)BOOTCFG_ADDR;
     void (*app)(void) = (void (*)(void))IMGHDR->start_addr;
-    uint32_t *dst = (uint32_t *)SRAM_ADDR;
+    uint32_t *dst = (uint32_t *)SRAM_BASE_ADDRESS;
     uint32_t *src = (uint32_t *)BOOTLOADER_SIZE;
     uint32_t len = bootcfg->len / sizeof(uint32_t);
     void *sp = (void *)IMGHDR->stack_ptr;

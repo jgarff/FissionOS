@@ -51,6 +51,7 @@
 
 
 #define FLASH_BLOCK_SIZE                          4096
+#define FLASH_PAGE_SIZE                           64
 
 
 typedef int (callback_t)(char *arg);
@@ -58,7 +59,7 @@ typedef int (callback_t)(char *arg);
 static struct libusb_device_handle *usbdev = NULL;
 static struct libusb_context *usbcontext;
 
-char *short_opts = "a:ru:i";
+char *short_opts = "a:bru:i";
 
 void usage(char *argv0)
 {
@@ -67,6 +68,7 @@ void usage(char *argv0)
     printf("\n");
     printf("Local USB Commands (no ipv6 address):\n");
     printf("    -i              Device Information\n");
+    printf("    -b              Reset Device to Bootloader\n");
     printf("    -r              Reset Device\n");
     printf("    -u <filename>   Upload firmware file\n");
     printf("    -h              Help\n");
@@ -116,19 +118,23 @@ void dev_close(struct libusb_device_handle *dev)
 int get_device(char *arg)
 {
 	device_info_t device_info;
+    int result;
 
-    if (libusb_control_transfer(usbdev,
+    result = libusb_control_transfer(usbdev,
                                 LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR |
                                 LIBUSB_RECIPIENT_DEVICE,
                                 USB_VENDOR_REQUEST_INFO, 0, 0,
-                                (uint8_t *)&device_info, sizeof(device_info), 0) != sizeof(device_info))
+                                (uint8_t *)&device_info, sizeof(device_info), 0);
+    if (result != sizeof(device_info))
     {
-        fprintf(stderr, "libusb_control_transfer failed\n");
+        fprintf(stderr, "libusb_control_transfer failed %d\n", result);
         return -1;
     }
 
     printf("Bank: %d\n", device_info.bank);
     printf("Size: %dKb\n", device_info.size / 1024);
+    printf("Mode: %s\n", device_info.flags & DEVICE_INFO_FLAGS_BOOTLOADER ?
+                         "Bootloader" : "Normal");
 
     return 0;
 }
@@ -149,35 +155,66 @@ int reset_device(char *arg)
     return 0;
 }
 
-int update(char *arg)
+int reset_device_bl(char *arg)
 {
-    char *filename = arg;
-    FILE *f = fopen(filename, "r");
+    if (libusb_control_transfer(usbdev,
+                                LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR |
+                                LIBUSB_RECIPIENT_DEVICE,
+                                USB_VENDOR_REQUEST_RESET, 1, 0,
+                                NULL, 0, 0) != 0)
+    {
+        fprintf(stderr, "libusb_control_transfer failed\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+int update_v2(FILE *f, fwheader_v2_t *header)
+{
+    uint8_t buf[FLASH_PAGE_SIZE];
     uint32_t addr = 0;
+    int ret, n;
+
+    fseek(f, 0, SEEK_SET);
+
+    n = fread(buf, 1, sizeof(buf), f);
+    while (n > 0)
+    {
+        ret = libusb_control_transfer(usbdev,
+                                      LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR |
+                                      LIBUSB_RECIPIENT_DEVICE,
+                                      USB_VENDOR_REQUEST_FLASH,
+                                      addr >> 16, addr & 0xffff,
+                                      buf, n, 0);
+        if (ret != n)
+        {
+            fprintf(stderr, "Firmware update failed %d %d\n", ret, n);
+            fclose(f);
+
+            return -1;
+        }
+
+        addr += n;
+        n = fread(buf, 1, sizeof(buf), f);
+    }
+
+    if (n < 0)
+    {
+        fprintf(stderr, "File read error\n");
+        fclose(f);
+
+        return -1;
+    }
+
+    return 0;
+}
+
+int update_v1(FILE *f, fwheader_t *header)
+{
     uint8_t buf[FLASH_BLOCK_SIZE];
-    fwheader_t header;
-    int n, ret;
-
-    if (!f)
-    {
-        fprintf(stderr, "can't open file\n");
-        return -1;
-    }
-
-    n = fread(&header, 1, sizeof(header), f);
-    if (n != sizeof(header))
-    {
-        fprintf(stderr, "can't read file\n");
-        fclose(f);
-        return -1;
-    }
-
-    if (header.magic != FWHEADER_MAGIC)
-    {
-        fprintf(stderr, "Not a firmware file\n");
-        fclose(f);
-        return -1;
-    }
+    uint32_t addr = 0;
+    int ret, n;
 
     fseek(f, sizeof(header), SEEK_SET);
 
@@ -230,6 +267,61 @@ int update(char *arg)
     return 0;
 }
 
+int update(char *arg)
+{
+    char *filename = arg;
+    FILE *f = fopen(filename, "r");
+    fwheader_t header;
+    fwheader_v2_t v2_header;
+    int n;
+
+    if (!f)
+    {
+        fprintf(stderr, "can't open file\n");
+        return -1;
+    }
+
+    n = fread(&header, 1, sizeof(header), f);
+    if (n != sizeof(header))
+    {
+        fprintf(stderr, "can't read file\n");
+        fclose(f);
+        return -1;
+    }
+
+    if (header.magic == FWHEADER_MAGIC)
+    {
+        int result = update_v1(f, &header);
+        fclose(f);
+
+        return result;
+    }
+
+    fseek(f, 0, SEEK_SET);
+
+    n = fread(&v2_header, 1, sizeof(v2_header), f);
+    if (n != sizeof(v2_header))
+    {
+        fprintf(stderr, "can't read file\n");
+        fclose(f);
+
+        return -1;
+    }
+
+    if (v2_header.magic == FWHEADER_V2_MAGIC)
+    {
+        int result = update_v2(f, &v2_header);
+        fclose(f);
+
+        return result;
+    }
+
+    fprintf(stderr, "Not a firmware file\n");
+    fclose(f);
+
+    return -1;
+}
+
 int usb_command(callback_t *callback, char *arg)
 {
     int ret;
@@ -265,6 +357,10 @@ int main(int argc, char *argv[])
 
             case 'i':
                 callback = get_device;
+                break;
+
+            case 'b':
+                callback = reset_device_bl;
                 break;
 
             case 'r':

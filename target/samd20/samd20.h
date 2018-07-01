@@ -62,7 +62,11 @@
 #define BOOTCFG_MAGIC                            0x90187340
 
 
-#define SRAM_ADDR                                0x20000000
+#define SRAM_SIZE                                (32 * 1024)
+#define RESET_CONFIG_ADDR                        ((volatile uint8_t *)SRAM_BASE_ADDRESS + SRAM_SIZE - \
+                                                                       sizeof(uint32_t))
+#define RESET_CONFIG                             ((volatile uint32_t *)RESET_CONFIG_ADDR)
+
 
 
 typedef struct imghdr

@@ -54,13 +54,13 @@ static void nvm_busy_wait(void)
 
 static void nvm_row_erase(void)
 {
-    NVMCTRL->ctrla = NVMCTRL_CTRLA_CMD_ER | NVMCTRL_CTRLA_CMDEX;
+    write16(&NVMCTRL->ctrla, NVMCTRL_CTRLA_CMD_ER | NVMCTRL_CTRLA_CMDEX);
     nvm_busy_wait();
 }
 
 static void nvm_page_write(void)
 {
-    NVMCTRL->ctrla = NVMCTRL_CTRLA_CMD_WP | NVMCTRL_CTRLA_CMDEX;
+    write16(&NVMCTRL->ctrla, NVMCTRL_CTRLA_CMD_WP | NVMCTRL_CTRLA_CMDEX);
     nvm_busy_wait();
 }
 
@@ -101,13 +101,13 @@ void nvm_write(uint32_t addr, uint8_t *data, uint32_t len)
 
 static void nvm_pagebuf_clear(void)
 {
-    NVMCTRL->ctrla = NVMCTRL_CTRLA_CMD_PBC | NVMCTRL_CTRLA_CMDEX;
+    write16(&NVMCTRL->ctrla, NVMCTRL_CTRLA_CMD_PBC | NVMCTRL_CTRLA_CMDEX);
     nvm_busy_wait();
 }
 
 static int nvm_auxpage_erase(void)
 {
-    NVMCTRL->ctrla = NVMCTRL_CTRLA_CMD_EAR | NVMCTRL_CTRLA_CMDEX;
+    write16(&NVMCTRL->ctrla, NVMCTRL_CTRLA_CMD_EAR | NVMCTRL_CTRLA_CMDEX);
     nvm_busy_wait();
 
     return 0;
@@ -115,7 +115,7 @@ static int nvm_auxpage_erase(void)
 
 static int nvm_auxpage_write(void)
 {
-    NVMCTRL->ctrla = NVMCTRL_CTRLA_CMD_WAP | NVMCTRL_CTRLA_CMDEX;
+    write16(&NVMCTRL->ctrla, NVMCTRL_CTRLA_CMD_WAP | NVMCTRL_CTRLA_CMDEX);
     nvm_busy_wait();
 
     return 0;
@@ -137,6 +137,11 @@ static int nvm_user_row_write(nvm_user_t *nvmuser)
     nvm_auxpage_write();
 
     return 0;
+}
+
+uint32_t nvm_crc32(uint32_t addr, uint32_t len)
+{
+    return crc32((uint8_t *)addr, len);
 }
 
 int cmd_nvm(console_t *console, int argc, char *argv[])

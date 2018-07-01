@@ -1,8 +1,8 @@
 /*
- * samd.h
+ * samd21_bootloader.h
  *
  *
- * Copyright (c) 2017 Western Digital Corporation or its affiliates.
+ * Copyright (c) 2018 Western Digital Corporation or its affiliates.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -37,29 +37,12 @@
 #define __SAMD_H__
 
 
+#include <fwheader.h>
+
+
 #define GCLK0_HZ                                 48000000
 #define GCLK0                                    0
 #define GCLK1                                    1
-
-#define SPI_DEV                                  SERCOM3_SPI
-#define SPI_CLOCK                                GCLK_SERCOM3_CORE
-#define SPI_CLOCK_BAUD                           5000000
-#define SPI_PERIPHERAL                           PERIPHERAL_ID_SERCOM3
-#define SPI_DEVNUM                               3
-#define SPI_DIPO                                 3
-#define SPI_DOPO                                 0
-#define SPI_FORM                                 0
-#define SPI_MOSI_PORT                            PORTA
-#define SPI_MOSI_PIN                             16
-#define SPI_MOSI_MUX                             3
-#define SPI_SCK_PORT                             PORTA
-#define SPI_SCK_PIN                              17
-#define SPI_SCK_MUX                              3
-#define SPI_MISO_PORT                            PORTA
-#define SPI_MISO_PIN                             19
-#define SPI_MISO_MUX                             3
-#define SPI_SS_PORT                              PORTA
-#define SPI_SS_PIN                               18
 
 #define RFRST_N_PORT                             PORTA
 #define RFRST_N_PIN                              15
@@ -88,20 +71,21 @@
 #define STATUS_MAX                               16
 #define LED_TCC_MAX                              (1 << STATUS_MAX)
 
-#define DIO0_PORT                                PORTA
-#define DIO0_PIN                                 9
-#define DIO0_INTNUM                              9
-#define DIO0_MUX                                 0
-
 #define BOOTLOADER_SIZE                          (32 * 1024)
 #define FLASH_SIZE_BYTES                         (256 * 1024)
+
+#define BOOTCFG_ADDR                             (FLASH_SIZE_BYTES - (8 * 1024))
+#define BOOTCFG_MAGIC                            0x90187340
+
 
 #define SRAM_SIZE                                (32 * 1024)
 #define FLASH_SIZE                               (256 * 1024)
 #define RESET_CONFIG_ADDR                        ((volatile uint8_t *)SRAM_BASE_ADDRESS + SRAM_SIZE - \
-                                                                       sizeof(uint32_t))
+                                                                      sizeof(uint32_t))
 #define RESET_CONFIG                             ((volatile uint32_t *)RESET_CONFIG_ADDR)
 
+
+#define IMGHDR                                   ((volatile fwheader_v2_t *)BOOTLOADER_SIZE)
 
 
 #endif /* __SAMD_H__ */

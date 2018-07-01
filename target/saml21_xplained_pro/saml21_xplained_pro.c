@@ -59,6 +59,7 @@
 #include "saml21_xplained_pro.h"
 
 
+volatile uint32_t *reset_config = RESET_CONFIG;
 console_t console;
 
 //

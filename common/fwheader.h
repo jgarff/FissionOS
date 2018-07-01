@@ -53,5 +53,19 @@ typedef struct
     version_t version;
 } __attribute__ ((packed)) fwheader_t;
 
+typedef struct
+{
+    uint32_t magic;
+#define FWHEADER_V2_MAGIC                        0x0bb08944
+    uint32_t flags;
+    uint32_t crc;
+    uint32_t len;
+    version_t version;
+    uint8_t  desc[108];                          
+    uint32_t stack_ptr;                          // Align field to 128 byte offset
+    uint32_t start_addr;
+} __attribute__ ((packed)) fwheader_v2_t;
+
+
 
 #endif /* __FWHEADER_H__ */

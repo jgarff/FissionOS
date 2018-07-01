@@ -56,7 +56,6 @@ def cortexm_flags(env):
         -g
         -ffunction-sections
         -fdata-sections
-        -fno-omit-frame-pointer
     '''.split()
 
     env['CFLAGS'] = cflags
@@ -279,6 +278,43 @@ def cortexm_builders(env):
 
         create_app_header(source[0].abspath, target[0].abspath)
 
+    def create_app_bl_image(target, source, env):
+        def create_app_bl_header(source, dest):
+            data = [ord(x) for x in file(source, "rb").read()]
+            align = 64 - ((len(data) + 128) % 64)
+            data = data + ([0] * align)
+
+            size = len(data)
+            crc = crc32(data)
+
+            major, minor, micro, nano = (0, 0, 0, 0)
+            if 'VERSION' in env:
+                major, minor, micro = env['VERSION']
+
+            if env['V']:
+                print "  Version : " + str(major) + "." + str(minor) + "." + str(micro)
+                print "  Size    : " + str(size)
+                print "  CRC     : " + hex(crc)
+
+            header = [ # magic
+                       0x44, 0x89, 0xb0, 0x0b,
+                       # flags
+                       0, 0, 0, 0,
+                       # crc - little endian
+                       crc & 0xff, (crc >> 8) & 0xff,
+                       (crc >> 16) & 0xff, (crc >> 24) & 0xff,
+                       # size - little endian
+                       size & 0xff, (size >> 8) & 0xff,
+                       (size >> 16) & 0xff, (size >> 24) & 0xff,
+                       # version
+                       int(major), int(minor), int(micro), 0,
+                     ] + [0] * 108 # desc
+
+            outdata = array.array("B", header + data)
+            outdata.tofile(file(dest, "wb"))
+
+        create_app_bl_header(source[0].abspath, target[0].abspath)
+
     # Combined image with bootloader and application
     #
     # Make sure to pad the bootloader size out to the full section (80k)
@@ -318,6 +354,10 @@ def cortexm_builders(env):
         'Firmware' : SCons.Builder.Builder(
             action = SCons.Action.Action(create_app_image, "${FWCOMSTR}"),
             suffix = ".fw"
+        ),
+        'BLFirmware' : SCons.Builder.Builder(
+            action = SCons.Action.Action(create_app_bl_image, "${FWCOMSTR}"),
+            suffix = ".blfw"
         ),
         'SectionHeader' : SCons.Builder.Builder(
             action = SCons.Action.Action(create_section_header, "${SECTIONCOMSTR}"),

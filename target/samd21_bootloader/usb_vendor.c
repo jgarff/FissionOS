@@ -2,7 +2,7 @@
  * hwheader.h
  *
  *
- * Copyright (c) 2017 Jeremy Garff
+ * Copyright (c) 2018 Jeremy Garff
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -49,16 +49,17 @@
 #include <saml_nvm.h>
 #include <saml_reset.h>
 
+#include "samd21_bootloader.h"
+
 #include "usb_vendor.h"
 
 
 #define FLASH_STATE_NONE                         0
 #define FLASH_STATE_APP                          1
-#define FLASH_STATE_SIG                          2
 
 #define WORKER_TYPE_NONE                         0
-#define WORKER_TYPE_RESET                        1
-#define WORKER_TYPE_SWITCH_BANK                  2
+#define WORKER_TYPE_RESET_APP                    1
+#define WORKER_TYPE_RESET_BL                     2
 
 uint32_t page_offset = 0;
 uint32_t page_addr;
@@ -73,17 +74,19 @@ void usb_vendor_worker(void *arg)
 
     switch (type)
     {
-        case WORKER_TYPE_RESET:
-            saml_soft_reset();
+        case WORKER_TYPE_RESET_APP:
+            *reset_config = RESET_CONFIG_APPLICATION;
             break;
 
-        case WORKER_TYPE_SWITCH_BANK:
-            nvm_switch_bank();
+        case WORKER_TYPE_RESET_BL:
+            *reset_config = RESET_CONFIG_BOOTLOADER;
             break;
 
         default:
             break;
     }
+
+    saml_soft_reset();
 
     return;
 }
@@ -100,9 +103,18 @@ static void rx_vendor_setup(usb_endpoint_entry_t *ep, usb_request_t *req)
     {
         case USB_VENDOR_REQUEST_RESET:
             usb_txbuffer_start(ep, NULL, 0);
-            // Schedule the bank switch in 1 second to make sure
+
+            if (req->value[0] & 0x1)
+            {
+                switch_bank_wq.arg = (void *)WORKER_TYPE_RESET_BL;
+            }
+            else
+            {
+                switch_bank_wq.arg = (void *)WORKER_TYPE_RESET_APP;
+            }
+
+            // Schedule the reset in 1 second to make sure
             // the USB request is completed first
-            switch_bank_wq.arg = (void *)WORKER_TYPE_RESET;
             workqueue_add(&switch_bank_wq, SYSTICK_FREQ);
 
             break;
@@ -113,8 +125,6 @@ static void rx_vendor_setup(usb_endpoint_entry_t *ep, usb_request_t *req)
             break;
 
         case USB_VENDOR_REQUEST_FLASH:
-            nvm_cache_disable();
-
             page_addr = (((uint32_t)req->value[0] << 24) |
                         ((uint32_t)req->value[1] << 16) |
                         (uint32_t)req->index);
@@ -123,19 +133,14 @@ static void rx_vendor_setup(usb_endpoint_entry_t *ep, usb_request_t *req)
             flash_state = FLASH_STATE_APP;
 
             break;
-
-        case USB_VENDOR_REQUEST_FLASH_DONE:
-            flash_state = FLASH_STATE_SIG;
-
-            break;
     }
 }
 
 static uint16_t rx_vendor_out(usb_endpoint_entry_t *ep)
 {
-    uint32_t addr = page_addr + page_offset;
+    uint32_t addr = BOOTLOADER_SIZE + page_addr + page_offset;
+    char buf[NVM_PAGE_SIZE];
 	int len;
-    char buf[64];
 
     len = usb_endpoint_buffer_read(ep, buf, sizeof(buf));
 
@@ -145,37 +150,6 @@ static uint16_t rx_vendor_out(usb_endpoint_entry_t *ep)
             {
                 nvm_write(addr, (uint8_t *)buf, len);
                 page_offset += len;
-            }
-
-            break;
-
-        case FLASH_STATE_SIG:
-            if (len == sizeof(fwheader_t))
-            {
-                fwheader_t *header = (fwheader_t *)buf;
-                uint32_t crc;
-
-                // Validate the header a bit
-                if (header->magic != FWHEADER_MAGIC)
-                {
-                    break;
-                }
-
-                // Make sure last page is written
-                nvm_write(addr, NULL, 0);
-
-                nvm_cache_enable();
-
-                crc = nvm_crc32(0, header->len);
-                if (crc != header->crc)
-                {
-                    break;
-                }
-
-                // Schedule the bank switch in 1 second to make sure
-                // the USB request is completed first
-                switch_bank_wq.arg = (void *)WORKER_TYPE_SWITCH_BANK;
-                workqueue_add(&switch_bank_wq, SYSTICK_FREQ);
             }
 
             break;
@@ -190,9 +164,9 @@ static uint16_t rx_vendor_out(usb_endpoint_entry_t *ep)
 
 void usb_vendor_init(void)
 {
-    device_info.bank = nvm_active_bank();
-    device_info.size = nvm_bank_offset();
-    device_info.flags = 0;
+    device_info.bank = 0;
+    device_info.size = FLASH_SIZE;
+    device_info.flags = DEVICE_INFO_FLAGS_BOOTLOADER;
 
     // Register callbacks to handle vendor specific traffic.
     usb_control0_vendor_register(rx_vendor_setup, rx_vendor_out);

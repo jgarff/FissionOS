@@ -55,7 +55,7 @@
 #include "samd20_xmodem.h"
 
 
-extern uint32_t __config_word;
+volatile uint32_t *reset_config = RESET_CONFIG;
 
 console_t console;
 

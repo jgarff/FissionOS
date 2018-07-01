@@ -41,7 +41,9 @@
 #include <console.h>
 
 #include "saml_reset.h"
-
+#ifdef __ATSAMD21__
+#include "saml_clocks.h"
+#endif /* __ATSAMD21__ */
 
 int cmd_reset(console_t *console, int argc, char *argv[])
 {
@@ -67,7 +69,12 @@ int cmd_reset(console_t *console, int argc, char *argv[])
 
         for (i = 0; i < ARRAY_SIZE(reasons); i++)
         {
-            if (RESET->rcause & (1 << i))
+#ifdef __ATSAMD21__
+            uint8_t code = PM->rcause;
+#else /* __ATSAMD21__ */
+            uint8_t code = RESET->rcause;
+#endif /* __ATSAMD21__ */
+            if (code & (1 << i))
             {
                 reason = reasons[i];
                 break;
@@ -80,7 +87,7 @@ int cmd_reset(console_t *console, int argc, char *argv[])
     }
     else if (!strcmp(argv[1], "app"))
     {
-        RESET_CONFIG = RESET_CONFIG_APPLICATION;
+        *reset_config = RESET_CONFIG_APPLICATION;
 
         saml_soft_reset();
 
@@ -88,7 +95,7 @@ int cmd_reset(console_t *console, int argc, char *argv[])
     }
     else if (!strcmp(argv[1], "bootloader"))
     {
-        RESET_CONFIG = RESET_CONFIG_BOOTLOADER;
+        *reset_config = RESET_CONFIG_BOOTLOADER;
 
         saml_soft_reset();
 

@@ -350,7 +350,6 @@ void nvm_cache_enable(void);
 uint32_t nvm_bank_offset(void);
 int nvm_active_bank(void);
 void nvm_switch_bank(void);
-uint32_t nvm_crc32(uint32_t addr, uint32_t len);
 
 #endif /* #if defined(__ATSAMD53__) */
 
@@ -358,6 +357,6 @@ int cmd_nvm(console_t *console, int argc, char *argv[]);
 
 // data and len must be multiples of 32-bit words
 void nvm_write(uint32_t addr, uint8_t *data, uint32_t len);
-
+uint32_t nvm_crc32(uint32_t addr, uint32_t len);
 
 #endif /* __SAML_NVM_H__ */

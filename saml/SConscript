@@ -79,6 +79,7 @@ samd21_sources = Split('''
     saml_tcc.c
     saml_adc.c
     saml_port.c
+    saml_reset.c
 ''')
 
 platforms = [

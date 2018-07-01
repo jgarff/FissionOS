@@ -56,24 +56,18 @@
 #include "usb_serial.h"
 #include "usb_vendor.h"
 
-#include "rfm69hcw.h"
-
-#include "samd21_version.h"
-#include "samd21.h"
+#include "samd21_bootloader_version.h"
+#include "samd21_bootloader.h"
 
 
 volatile uint32_t *reset_config = RESET_CONFIG;
-
-#define RFFREECOUNT                              8
-rfbuf_t rfbufs[RFFREECOUNT];
-rf69_spi_pkt_t rfpktbufs[RFFREECOUNT];
 
 console_t console;
 
 cmd_entry_t cmd_table[] =
 {
     CONSOLE_CMD_HELP,
-    CONSOLE_CMD_RF,
+    CONSOLE_CMD_NVM,
     CONSOLE_CMD_RESET,
     CONSOLE_CMD_USB,
 };
@@ -150,7 +144,6 @@ void clock_open(void)
         ;
 }
 
-
 void vbus_callback(void *arg)
 {
     if (port_get(VBUS_PORT, VBUS_PIN))
@@ -183,21 +176,10 @@ int status_direction = 1;
 int status_value = 0;
 void status_worker(void *arg)
 {
-    if (!status_direction)
+    status_value++;
+    if (status_value >= STATUS_MAX)
     {
-        status_value--;
-        if (!status_value)
-        {
-            status_direction = 1;
-        }
-    }
-    else
-    {
-        status_value++;
-        if (status_value >= (STATUS_MAX - 1))
-        {
-            status_direction = 0;
-        }
+        status_value = 0;
     }
 
     tcc_pwm_duty(LED_TCC, LED_TCC_CHANNEL, (status_value * LED_TCC_MAX) / STATUS_MAX); 
@@ -205,136 +187,67 @@ void status_worker(void *arg)
     workqueue_add(&status_wq, (SYSTICK_FREQ * (1000 / STATUS_MAX)) / 1000);
 }
 
-spi_drv_t spi_drv;
-
-uint8_t rssiconfig[] = { RFM69_REG_RSSICONFIG_START };
-uint8_t rxbw[] = { RFM69_REG_RXBW_DCC_FREQ(0x2) | RFM69_REG_RXBW_MANT(0x2) |
-                   RFM69_REG_RXBW_EXP(0x5)};
-uint8_t afcbw[] = { RFM69_REG_AFCBW_DCC_FREQ(0x4) | RFM69_REG_AFCBW_MANT(0x1) |
-                    RFM69_REG_AFCBW_EXP(0x3)};
-uint8_t diomapping2[] = { RFM69_REG_DIOMAPPING2_CLKOUT_OFF };
-uint8_t rssithresh[] = { 0xe4 };
-uint8_t syncvalue[] = RF69_NETWORK_ID;
-uint8_t fifothresh[] = { RFM69_REG_FIFOTHRESH_TXSTARTCONDITION |
-                         RFM69_REG_FIFOTHRESH_FIFOTHRESHOLD(0xf) };
-uint8_t testdagc[] = { 0x30 };
-uint8_t lna[] = { RFM69_REG_LNA_ZIN };
-uint8_t packetconfig1[] = { RFM69_REG_PACKETCONFIG1_PACKETFORMAT | 
-                          RFM69_REG_PACKETCONFIG1_DCFREE_WHITEN |
-                          RFM69_REG_PACKETCONFIG1_CRCON |
-                          RFM69_REG_PACKETCONFIG1_ADDR_NODEBCAST };
-
-rf69_reg_init_t rf69_regs[] = {
-    {
-        .addr = RFM69_REG_RXBW,
-        .data = rxbw,
-        .len = sizeof(rxbw),
-    },
-    {
-        .addr = RFM69_REG_AFCBW,
-        .data = afcbw,
-        .len = sizeof(afcbw),
-    },
-    {
-        .addr = RFM69_REG_DIOMAPPING2,
-        .data = diomapping2,
-        .len = sizeof(diomapping2),
-    },
-    {
-        .addr = RFM69_REG_RSSITHRESH,
-        .data = rssithresh,
-        .len = sizeof(rssithresh),
-    },
-    {
-        .addr = RFM69_REG_SYNCVALUE,
-        .data = syncvalue,
-        .len = sizeof(syncvalue),
-    },
-    {
-        .addr = RFM69_REG_FIFOTHRESH,
-        .data = fifothresh,
-        .len = sizeof(fifothresh),
-    },
-    {
-        .addr = RFM69_REG_TESTDAGC,
-        .data = testdagc,
-        .len = sizeof(testdagc),
-    },
-    {
-        .addr = RFM69_REG_LNA,
-        .data = lna,
-        .len = sizeof(lna),
-    },
-    {
-        .addr = RFM69_REG_PACKETCONFIG1,
-        .data = packetconfig1,
-        .len = sizeof(packetconfig1),
-    },
-};
-
-void rf_worker(void *arg);
-workqueue_t rf_wq = {
-    .callback = rf_worker,
-    .arg = NULL,
-};
-
-#define RF_WORKER_RESET                          0
-#define RF_WORKER_RESET_DONE                     1
-#define RF_WORKER_INIT                           2
-#define RF_WORKER_TX                             3
-int rf_worker_state = RF_WORKER_RESET;
-void rf_worker(void *arg)
+int bootloader_active(void)
 {
-    switch (rf_worker_state)
+    uint32_t rcause = PM->rcause;
+
+    if (!(rcause & PM_RCAUSE_SYST))
     {
-        case RF_WORKER_RESET:
-            port_set(RFRST_N_PORT, RFRST_N_PIN, 1);
-            rf_worker_state++;
-            break;
+        *reset_config = RESET_CONFIG_APPLICATION;
 
-        case RF_WORKER_RESET_DONE:
-            port_set(RFRST_N_PORT, RFRST_N_PIN, 0);
-            rf_worker_state++;
-            break;
-
-        case RF_WORKER_INIT:
-            rf69_regs_init(&spi_drv, rf69_regs, ARRAY_SIZE(rf69_regs));
-            rf_worker_state++;
-            break;
-
-        case RF_WORKER_TX:
-            rf69_tx(&spi_drv, RF69_BROADCAST_ADDR, 1, 0, 0, NULL, 0, NULL, NULL);
-            workqueue_add(&rf_wq, SYSTICK_FREQ / 10);
-            return;
-
-        default:
-            return;
+        return 0;
     }
 
+    if (*reset_config == RESET_CONFIG_BOOTLOADER)
+    {
+        return 1;
+    }
 
-    workqueue_add(&rf_wq, SYSTICK_FREQ);
+    return 0;
 }
 
-void dio0_cb(void *arg)
+void application_start(void)
 {
-    rf69_dio0_int(&spi_drv);
+    void (*app)(void) = (void (*)(void))IMGHDR->start_addr;
+    void *sp = (void *)IMGHDR->stack_ptr;
+    uint32_t crc;
+
+    if (IMGHDR->magic != FWHEADER_V2_MAGIC)
+    {
+        return;
+    }
+
+    crc = nvm_crc32((uint32_t)&IMGHDR->stack_ptr, IMGHDR->len);
+    if (IMGHDR->crc != crc)
+    {
+        return;
+    }
+
+    // Set the stack pointer
+    asm volatile ("msr psp, %0;"
+                  :                 /* no output */
+                  : "r"(sp)         /* stack pointer input */
+                  :                 /* no clobbered register */
+            );
+
+    app();
 }
-
-ext_int_t dio0 =
-{
-    .callback = dio0_cb,
-    .arg = NULL,
-
-};
 
 //
 // Main initialization
 //
 int main(int argc, char *argv[])
 {
+    if (!bootloader_active())
+    {
+        application_start();
+    }
+
     clock_init();
 
     systick_init(GCLK0_HZ);
+
+    PM->apbbmask |= PM_APBBMASK_NVMCTRL;
 
     PM->ahbmask |= PM_AHBMASK_USB;
     PM->apbbmask |= PM_APBBMASK_USB;
@@ -354,7 +267,7 @@ int main(int argc, char *argv[])
                  (console_recv_t)usb_console_recv,
                  NULL);
 
-    // Red LED
+    // Blue LED
     PM->apbcmask |= PM_APBCMASK_TCC1;
     gclk_peripheral_enable(GCLK0, GCLK_TCC0_TCC1);
     port_peripheral_enable(LED_PORT, LED_PIN, LED_MUX);
@@ -365,44 +278,12 @@ int main(int argc, char *argv[])
     // Green LED
     port_peripheral_disable(LED1_PORT, LED1_PIN);
     port_dir(LED1_PORT, LED1_PIN, 1);
-    port_set(LED1_PORT, LED1_PIN, 1);
-
-    // RF Reset -- Turn on internal pull-up
-    port_peripheral_disable(RFRST_N_PORT, RFRST_N_PIN);
-    port_dir(RFRST_N_PORT, RFRST_N_PIN, 1);
-    port_set(RFRST_N_PORT, RFRST_N_PIN, 0);
-
-    //
-    // Setup SPI
-    //
-    PM->apbcmask |= PM_APBCMASK_SERCOM3;
-    gclk_peripheral_enable(GCLK0, GCLK_SERCOMx_SLOW);
-    gclk_peripheral_enable(GCLK0, SPI_CLOCK);
-    port_peripheral_enable(SPI_MISO_PORT, SPI_MISO_PIN, SPI_MISO_MUX);
-    port_peripheral_enable(SPI_MOSI_PORT, SPI_MOSI_PIN, SPI_MOSI_MUX);
-    port_peripheral_enable(SPI_SCK_PORT, SPI_SCK_PIN, SPI_SCK_MUX);
-    port_peripheral_disable(SPI_SS_PORT, SPI_SS_PIN);
-    port_dir(SPI_SS_PORT, SPI_SS_PIN, 1);
-    spi_master_init(SPI_DEVNUM, &spi_drv, SPI_PERIPHERAL,
-                           GCLK0_HZ, SPI_CLOCK_BAUD, 
-                           SPI_SS_PORT, SPI_SS_PIN,
-                           SPI_DIPO, SPI_DOPO,
-                           SPI_FORM);
-    rf69_init(&spi_drv, rfbufs, rfpktbufs, ARRAY_SIZE(rfbufs));
-
-    //
-    // Setup RF external interrupt
-    //
-    PM->apbamask |= PM_APBAMASK_EIC;
-    gclk_peripheral_enable(GCLK0, GCLK_EIC);
-    port_peripheral_enable(DIO0_PORT, DIO0_PIN, DIO0_MUX);
-    port_dir(DIO0_PORT, DIO0_PIN, 0);
-    eic_int_setup(DIO0_INTNUM, &dio0, EIC_EDGE_RISE);
-    eic_int_enable(DIO0_INTNUM);
+    port_set(LED1_PORT, LED1_PIN, 0);
 
     //
     // Setup external interrupts
     //
+    PM->apbamask |= PM_APBAMASK_EIC;
     gclk_peripheral_enable(GCLK0, GCLK_EIC);
     port_peripheral_enable(VBUS_PORT, VBUS_PIN, VBUS_MUX);
     port_dir(VBUS_PORT, VBUS_PIN, 0);  // Input
@@ -416,11 +297,6 @@ int main(int argc, char *argv[])
     // Check for USB voltage
     //
     vbus_callback(NULL);
-
-    //
-    // Start radio processing
-    //
-    rf_worker(NULL);
 
     // Mainloop
     while (1)

@@ -1,5 +1,5 @@
 /*
- * product.h
+ * usb_config.h
  *
  *
  * Copyright (c) 2017 Jeremy Garff
@@ -33,35 +33,38 @@
  */
 
 
-#ifndef __PRODUCT_H__
-#define __PRODUCT_H__
+#define USB_SETTLE_mS                            50
+
+// String Descriptors referenced from the device descriptor
+#define USB_STR_DESC(name, data, len)                         \
+    usb_desc_string_t name =                                  \
+    {                                                         \
+        .length            = sizeof(usb_desc_string_t) +      \
+                             len,                             \
+        .type              = USB_DESC_TYPE_STRING,            \
+        .buffer            = data                             \
+    }
+
+#define USB_MAX_ENDPOINT                         4
+
+extern usb_desc_string_t *usb_str_desc[];
+extern usb_desc_device_t usb_desc;
+extern uint32_t usb_desc_len;
+
+// Configuration Descriptor
+typedef struct usb_desc_config_all {
+    usb_desc_config_t    config1;
+    usb_desc_interface_t interface1;
+    usb_desc_cdc_header_t header_desc;
+    usb_desc_cdc_acm_t acm_desc;
+    usb_desc_cdc_union_t union_desc;
+    usb_desc_endpoint_t  ep1;
+    usb_desc_interface_t interface2;
+    usb_desc_endpoint_t  ep2;
+    usb_desc_endpoint_t  ep3;
+} __attribute__((packed)) usb_desc_config_all_t;
+
+extern usb_desc_config_all_t usb_config;
+extern uint32_t usb_config_len;
 
 
-// We don't have a VID/PID so use something that isn't valid.
-// Unknown is already listed in linux as 0x0011
-#define MANUFACTURER                             { 0x11, 0x00 }
-#define PRODUCT                                  { 0x01, 0x01 }
-#define VERSION                                  { 0x01, 0x00 }
-
-
-/*
- *  USB transfer types
- */
-
-/*
- *  bRequest
- */
-#define USB_VENDOR_REQUEST_RESET                 0x01   // OUT
-#define USB_VENDOR_REQUEST_INFO                  0x02   // IN
-#define USB_VENDOR_REQUEST_FLASH                 0x03   // OUT
-
-typedef struct
-{
-    uint32_t bank;
-    uint32_t size;
-    uint32_t flags;
-#define DEVICE_INFO_FLAGS_BOOTLOADER             0x01
-} device_info_t;
-
-
-#endif /* __PRODUCT_H__ */

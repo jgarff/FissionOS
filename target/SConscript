@@ -43,6 +43,7 @@ cpu_info = {
 #   Target Entry Layout Example
 #
 #   'at91sam4e16' : [               # Target
+#       'none',                     # Firmware image type
 #       'cortexm4_at91sam4e',       # Platform environment
 #       'at91sam4e16_flash.ld',     # Linker script
 #       ['at91sam4e16.c'],          # CPU Sources
@@ -50,6 +51,7 @@ cpu_info = {
 
     'at91sam4e16' : [
         'at91sam4e',
+        'none',
         'at91sam4e16_flash.ld',
         Split('''
               at91sam4e16.c
@@ -58,6 +60,7 @@ cpu_info = {
 
     'at91sam4sd32c' : [
         'at91sam4sd',
+        'none',
         'at91sam4sd32c_flash.ld',
         Split('''
               at91sam4sd32c.c
@@ -66,6 +69,7 @@ cpu_info = {
 
     'at91sam4s16c' : [
         'at91sam4s',
+        'none',
         'at91sam4s16c_flash.ld',
         Split('''
               at91sam4s16c.c
@@ -74,6 +78,7 @@ cpu_info = {
 
     'at91saml21_flash' : [
         'at91saml21',
+        'none',
         'at91saml21_flash.ld',
         Split('''
               saml21_xplained_pro/usb_config.c
@@ -82,38 +87,46 @@ cpu_info = {
 
     'at91saml21_sram' : [
         'at91saml21',
+        'none',
         'at91saml21_sram.ld',
         [],
     ],
 
     'atsamd20' : [
         'atsamd20',
+        'none',
         'atsamd20_flash.ld',
         Split('''
-            samd20/samd20_xmodem.c
         '''),
     ],
 
     'atsamd21' : [
         'atsamd21',
+        'blfw',
         'atsamd21_flash.ld',
         Split('''
-              samd21/usb_config.c
-              samd21/usb_vendor.c
+        '''),
+    ],
+
+    'atsamd21_bootloader' : [
+        'atsamd21',
+        'none',
+        'atsamd21_bootloader.ld',
+        Split('''
         '''),
     ],
 
     'atsamd53' : [
         'atsamd53',
+        'none',
         'atsamd53_flash.ld',
         Split('''
-              samd53/usb_config.c
-              samd53/usb_vendor.c
         '''),
     ],
 
     'imx6' : [
         'imx6',
+        'none',
         'imx6_ocram.ld',
         [],
     ],
@@ -176,6 +189,7 @@ board_info = {
     'samd20' : [
         'atsamd20',
         Split('''
+            samd20/samd20_xmodem.c
         '''),
         [],
     ],
@@ -183,6 +197,17 @@ board_info = {
     'samd21' : [
         'atsamd21',
         Split('''
+              samd21/usb_config.c
+              samd21/usb_vendor.c
+        '''),
+        [],
+    ],
+
+    'samd21_bootloader' : [
+        'atsamd21_bootloader',
+        Split('''
+              samd21_bootloader/usb_config.c
+              samd21_bootloader/usb_vendor.c
         '''),
         [],
     ],
@@ -190,6 +215,8 @@ board_info = {
     'samd53' : [
         'atsamd53',
         Split('''
+              samd53/usb_config.c
+              samd53/usb_vendor.c
         '''),
         [],
     ],
@@ -206,7 +233,7 @@ board_info = {
 
 cpu_objects = {}
 for cpu in cpu_info:
-    platform, linkscript, cpu_sources = cpu_info[cpu]
+    platform, fwtype, linkscript, cpu_sources = cpu_info[cpu]
     benv = targets[platform]['ENV'].Clone()
 
     cpu_objects[platform] = []
@@ -216,7 +243,7 @@ for cpu in cpu_info:
 
 for board in board_info:
     cpu, board_sources, rom_files = board_info[board]
-    platform, linkscript, cpu_sources = cpu_info[cpu]
+    platform, fwtype, linkscript, cpu_sources = cpu_info[cpu]
     benv = targets[platform]['ENV'].Clone()
 
     # Generate board name including version
@@ -252,8 +279,15 @@ for board in board_info:
 
     # Create application image if it's in the environment
     if 'Firmware' in benv['BUILDERS']:
-        fw = benv.Firmware(board_name, binary);
-        defaults.append(fw)
+        if 'fw' == fwtype:
+            fw = benv.Firmware(board_name, binary);
+            defaults.append(fw)
+
+    # Create application image if it's in the environment
+    if 'BLFirmware' in benv['BUILDERS']:
+        if 'blfw' == fwtype:
+            fw = benv.BLFirmware(board_name, binary);
+            defaults.append(fw)
 
     Default(defaults)
 

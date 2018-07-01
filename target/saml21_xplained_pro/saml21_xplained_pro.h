@@ -95,5 +95,10 @@
 #define BUTTON_MUX                               0
 #define BUTTON_INTNUM                            2
 
+#define SRAM_SIZE                                (32 * 1024)
+#define RESET_CONFIG_ADDR                        ((volatile uint8_t *)SRAM_BASE_ADDRESS + SRAM_SIZE - \
+                                                                       sizeof(uint32_t))
+#define RESET_CONFIG                             ((volatile uint32_t *)RESET_CONFIG_ADDR)
+
 
 #endif /* __SAML21_XPLAINED_PRO_H__ */

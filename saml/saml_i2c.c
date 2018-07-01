@@ -65,10 +65,11 @@ static inline uint32_t i2c_data_read(sercom_i2c_t *i2c)
     uint32_t addr = (uint32_t)&i2c->data;
     uint32_t data;
 
-    asm volatile ("ldr %0, [%1];"
+    asm volatile ("mov r0, %1;"
+                  "ldr %0, [r0];"
                   : "=r"(data)
                   : "r"(addr)
-                  : "memory"
+                  : "memory", "r0"
                  );
 
     return data;

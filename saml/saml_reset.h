@@ -86,9 +86,11 @@ typedef struct reset
 #define SRAM_BASE_ADDRESS                        0x20000000
 // We'll place the reset config word where the stack pointer is loaded from the vector
 // table.  It's no longer used after loading, and is reset during loading
-#define RESET_CONFIG                             (*(volatile uint32_t *)SRAM_BASE_ADDRESS)
 #define RESET_CONFIG_APPLICATION                 (0x0 << 0)
 #define RESET_CONFIG_BOOTLOADER                  (0x1 << 0)
+
+// Must be declared by the platform source
+extern volatile uint32_t *reset_config;
 
 
 #define CONSOLE_CMD_RESET                        \

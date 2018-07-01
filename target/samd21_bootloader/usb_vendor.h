@@ -1,5 +1,5 @@
 /*
- * product.h
+ * usb_vendor.h
  *
  *
  * Copyright (c) 2017 Jeremy Garff
@@ -31,37 +31,11 @@
  * Author: Jeremy Garff <jer@jers.net>
  *
  */
+#ifndef __USB_VENDOR_H__
+#define __USB_VENDOR_H__
 
 
-#ifndef __PRODUCT_H__
-#define __PRODUCT_H__
+void usb_vendor_init(void);
 
 
-// We don't have a VID/PID so use something that isn't valid.
-// Unknown is already listed in linux as 0x0011
-#define MANUFACTURER                             { 0x11, 0x00 }
-#define PRODUCT                                  { 0x01, 0x01 }
-#define VERSION                                  { 0x01, 0x00 }
-
-
-/*
- *  USB transfer types
- */
-
-/*
- *  bRequest
- */
-#define USB_VENDOR_REQUEST_RESET                 0x01   // OUT
-#define USB_VENDOR_REQUEST_INFO                  0x02   // IN
-#define USB_VENDOR_REQUEST_FLASH                 0x03   // OUT
-
-typedef struct
-{
-    uint32_t bank;
-    uint32_t size;
-    uint32_t flags;
-#define DEVICE_INFO_FLAGS_BOOTLOADER             0x01
-} device_info_t;
-
-
-#endif /* __PRODUCT_H__ */
+#endif /* __USB_VENDOR_H__ */
