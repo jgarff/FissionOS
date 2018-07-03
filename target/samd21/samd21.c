@@ -310,7 +310,7 @@ void rf_worker(void *arg)
 
         case RF_WORKER_TX:
             rf69_tx(&spi_drv, RF69_BROADCAST_ADDR, 1, 0, 0, NULL, 0, NULL, NULL);
-            workqueue_add(&rf_wq, SYSTICK_FREQ / 2);
+            workqueue_add(&rf_wq, SYSTICK_FREQ / 5);
             return;
 
         default:
