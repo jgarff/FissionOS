@@ -39,16 +39,69 @@
 
 #include "vectors.h"
 #include "saml_sercom.h"
+#include "saml_port.h"
 #include "console.h"
 
 #include "rfm69hcw.h"
 
+//
+// Defines
+//
+#define RF69_STATE_IDLE                          0
+#define RF69_STATE_MODE_TX                       1
+#define RF69_STATE_TX_START                      2
+#define RF69_STATE_TX_DONE                       3
+#define RF69_STATE_LISTEN                        4
+#define RF69_STATE_RX                            5
+#define RF69_STATE_MODE_RX                       6
+
+
+//
+// Issues:
+//
+//
+
+//
+// Structures
+//
 typedef struct
 {
     char *name;
     uint8_t reg;
 } rfregs_t;
 
+
+//
+// Forward Declarations
+//
+void rf69_spi_cb(spi_drv_t *drv, int rxlen, int txlen, uint8_t *rxbuf, uint8_t *txbuf, void *arg);
+
+
+//
+// Globals
+//
+spi_drv_t *rf69_drv = NULL;
+uint8_t rf69_intnum = 0;
+int rf69_state = RF69_STATE_IDLE;
+
+uint32_t rf69_txcount = 0;
+uint32_t rf69_rxcount = 0;
+uint32_t rf69_ints = 0;
+
+volatile rfbuf_t rfbuf_freelist = {
+    .next = &rfbuf_freelist,
+    .prev = &rfbuf_freelist,
+};
+volatile rfbuf_t rfbuf_txlist = {
+    .next = &rfbuf_txlist,
+    .prev = &rfbuf_txlist,
+};
+volatile rfbuf_t rfbuf_rxlist = {
+    .next = &rfbuf_rxlist,
+    .prev = &rfbuf_rxlist,
+};
+
+// For debug console command
 rfregs_t rfregs[] = {
     {
         .name = "OpMode",
@@ -368,28 +421,10 @@ rfregs_t rfregs[] = {
     },
 };
 
-#define RF69_STATE_IDLE                          0
-#define RF69_STATE_TX                            1
-#define RF69_STATE_LISTEN                        2
-#define RF69_STATE_RX                            3
 
-spi_drv_t *rf69_drv = NULL;
-int rf69_state = RF69_STATE_IDLE;
-
-volatile rfbuf_t rfbuf_freelist = {
-    .next = &rfbuf_freelist,
-    .prev = &rfbuf_freelist,
-};
-volatile rfbuf_t rfbuf_txlist = {
-    .next = &rfbuf_txlist,
-    .prev = &rfbuf_txlist,
-};
-volatile rfbuf_t rfbuf_rxlist = {
-    .next = &rfbuf_rxlist,
-    .prev = &rfbuf_rxlist,
-};
-
-
+//
+// Free list helpers
+//
 void rfbuf_append(volatile rfbuf_t *head, volatile rfbuf_t *entry)
 {
     entry->next = head;
@@ -446,6 +481,9 @@ void rfbuf_free(volatile rfbuf_t *entry)
 }
 
 
+//
+// Mode change functions
+//
 uint8_t rf69_stbycmd[] = {
     RFM69_REG_WRITE(RFM69_REG_OPMODE),
     RFM69_REG_OPMODE_MODE_STDBY,
@@ -456,33 +494,26 @@ int rf69_mode_stdby(spi_drv_t *spi_drv)
 
     while (done == -1)
     {
-        done = spi_transfer(spi_drv, sizeof(rf69_stbycmd), NULL, rf69_stbycmd, NULL, NULL);
+        done = spi_transfer(spi_drv, 0, sizeof(rf69_stbycmd), NULL, rf69_stbycmd, NULL, NULL);
     }
 
     return 0;
 }
 
-void rf69_spi_rx_cb(spi_drv_t *drv, int len, uint8_t *rxbuf, uint8_t *txbuf, void *arg)
+uint8_t rf69_sleepcmd[] = {
+    RFM69_REG_WRITE(RFM69_REG_OPMODE),
+    RFM69_REG_OPMODE_MODE_SLEEP,
+};
+int rf69_mode_sleep(spi_drv_t *spi_drv)
 {
-    uint32_t irq_state;
-    volatile rfbuf_t *entry = rfbuf_txlist.next;
+    int done = -1;
 
-    irq_state = irq_save();
-
-    // Check to see if we got a transmit queued when we were changing modes
-    if (entry->next != entry)
+    while (done == -1)
     {
-        // Yep, go back to transmitting
-        rf69_state = RF69_STATE_TX;
-        rf69_mode_tx(drv);
-    }
-    else
-    {
-        // Nope, ready to get packets
-        rf69_state = RF69_STATE_LISTEN;
+        done = spi_transfer(spi_drv, 0, sizeof(rf69_sleepcmd), NULL, rf69_sleepcmd, NULL, NULL);
     }
 
-    irq_restore(irq_state);
+    return 0;
 }
 
 uint8_t rf69_rxcmd[] = {
@@ -491,16 +522,47 @@ uint8_t rf69_rxcmd[] = {
 };
 int rf69_mode_rx(spi_drv_t *spi_drv)
 {
+    int irq_state;
     int done = -1;
+
+    irq_state = irq_save();
+    rf69_state = RF69_STATE_MODE_RX;
+    irq_restore(irq_state);
 
     while (done == -1)
     {
-        done = spi_transfer(spi_drv, sizeof(rf69_rxcmd), NULL, rf69_rxcmd, rf69_spi_rx_cb, NULL);
+        done = spi_transfer(spi_drv, 0, sizeof(rf69_rxcmd), NULL, rf69_rxcmd, rf69_spi_cb, NULL);
     }
 
     return 0;
 }
 
+uint8_t rf69_txcmd[] = {
+    RFM69_REG_WRITE(RFM69_REG_OPMODE),
+    RFM69_REG_OPMODE_MODE_TX,
+};
+int rf69_mode_tx(spi_drv_t *spi_drv)
+{
+    int irq_state;
+    int done;
+
+    irq_state = irq_save();
+    rf69_state = RF69_STATE_MODE_TX;
+    eic_int_disable(rf69_intnum);
+    irq_restore(irq_state);
+
+    done = -1;
+    while (done == -1)
+    {
+        done = spi_transfer(spi_drv, 0, sizeof(rf69_txcmd), NULL, rf69_txcmd, rf69_spi_cb, NULL);
+    }
+
+    return 0;
+}
+
+//
+// Transmit state machine
+//
 void rf69_txdone(void)
 {
     volatile rfbuf_t *entry = rfbuf_txlist.next;
@@ -509,6 +571,8 @@ void rf69_txdone(void)
 
     rfbuf_unlink(entry);
     rfbuf_free(entry);
+
+    rf69_txcount++;
 
     if (cb)
     {
@@ -530,28 +594,123 @@ void rf69_txnext(spi_drv_t *drv)
             rf69_mode_rx(drv);
             return;
         }
+
+        rf69_state = RF69_STATE_TX_START;
         
         // Not done, transmit the next one.  If we get a spi failure, just try again as something else
         // was using the spi bus.
-        done = spi_transfer(drv, sizeof(entry->pkt) + entry->datalen, NULL, (uint8_t *)entry->pkt, NULL, NULL);
+        done = spi_transfer(drv, 0, sizeof(entry->pkt->hdr) + entry->datalen + 
+                            sizeof(entry->pkt->hdr.len),
+                            NULL, (uint8_t *)entry->pkt, rf69_spi_cb, NULL);
     }
 }
 
-// Interrupt handler for the external RF interrupt line, transmit complete, and new rx
-void rf69_dio0_int(void *arg)
+//
+// Receive
+//
+void rf69_spi_cb(spi_drv_t *drv, int rxlen, int txlen, uint8_t *rxbuf, uint8_t *txbuf, void *arg)
 {
-    spi_drv_t *drv = (spi_drv_t *)arg;
+    uint32_t irq_state;
+    volatile rfbuf_t *txentry = rfbuf_txlist.next;
+    volatile rfbuf_t *rxentry = rfbuf_rxlist.next;
+
+    irq_state = irq_save();
 
     switch (rf69_state)
     {
-        case RF69_STATE_TX:
-            rf69_txdone();
-            rf69_txnext(drv);
+        case RF69_STATE_MODE_RX:
+            rf69_state = RF69_STATE_LISTEN;
+            eic_int_enable(rf69_intnum);
+            break;
 
+        case RF69_STATE_MODE_TX:
+            rf69_txnext(drv);
+            break;
+
+        case RF69_STATE_TX_START:
+            rf69_state = RF69_STATE_TX_DONE;
+            eic_int_enable(rf69_intnum);
+            break;
+
+        case RF69_STATE_RX:
+            rf69_state = RF69_STATE_LISTEN;
+            if (rxentry->next != rxentry)
+            {
+                rfbuf_unlink(rxentry);
+                // TODO:  Packet parsing
+                rfbuf_free(rxentry);
+                rf69_rxcount++;
+            }
+
+            // Check to see if we got a transmit queued when we were changing modes
+            if (txentry->next != txentry)
+            {
+                // Yep, go back to transmitting
+                rf69_mode_tx(drv);
+            }
+            else
+            {
+                // Nope, ready to get packets
+                eic_int_enable(rf69_intnum);
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    irq_restore(irq_state);
+}
+
+void rf69_rx_handler(spi_drv_t *spi_drv)
+{
+    uint32_t irq_state;
+    volatile rfbuf_t *buf;
+    rf69_spi_pkt_t *pkt;
+
+    irq_state = irq_save();
+    buf = rfbuf_alloc();
+    if (!buf)
+    {
+        irq_restore(irq_state);
+        return;
+    }
+    rf69_state = RF69_STATE_RX;
+    irq_restore(irq_state);
+
+    pkt = buf->pkt;
+    pkt->reg = RFM69_REG_READ(RFM69_REG_FIFO);
+
+    rfbuf_append(&rfbuf_rxlist, buf);
+    
+    spi_transfer(spi_drv, sizeof(*pkt), 1, (uint8_t *)pkt, (uint8_t *)pkt, rf69_spi_cb, NULL);
+}
+
+void rf69_spi_int_cb(spi_drv_t *drv, int rxlen, int txlen, uint8_t *rxbuf, uint8_t *txbuf, void *arg)
+{
+    uint8_t irqflags2 = rxbuf[1];
+
+    switch (rf69_state)
+    {
+        case RF69_STATE_TX_DONE:
+            if (irqflags2 & RFM69_REG_IRQFLAGS2_PACKETSENT)
+            {
+                rf69_txdone();
+                rf69_txnext(drv);
+            } else {
+                eic_int_enable(rf69_intnum);
+            }
             break;
 
         case RF69_STATE_LISTEN:
-            // TODO:  Allocate new packet and receive data
+            if (irqflags2 & RFM69_REG_IRQFLAGS2_CRCOK)
+            {
+                rf69_rx_handler(drv);
+            }
+            else
+            {
+                eic_int_enable(rf69_intnum);
+            }
             break;
 
         default:
@@ -559,27 +718,36 @@ void rf69_dio0_int(void *arg)
     }
 }
 
-void rf69_spi_tx_cb(spi_drv_t *drv, int len, uint8_t *rxbuf, uint8_t *txbuf, void *arg)
-{
-    rf69_txnext(drv);
-}
-
-uint8_t rf69_txcmd[] = {
-    RFM69_REG_WRITE(RFM69_REG_OPMODE),
-    RFM69_REG_OPMODE_MODE_TX,
+uint8_t rf69_irqflags2_cmd[] = {
+    RFM69_REG_READ(RFM69_REG_IRQFLAGS2),
+    0,
 };
-int rf69_mode_tx(spi_drv_t *spi_drv)
+uint8_t rf69_irqflags2_data[sizeof(rf69_irqflags2_cmd)];
+int rf69_mode_irqflags2(spi_drv_t *spi_drv)
 {
     int done = -1;
 
     while (done == -1)
     {
-        done = spi_transfer(spi_drv, sizeof(rf69_txcmd), NULL, rf69_txcmd, rf69_spi_tx_cb, NULL);
+        done = spi_transfer(spi_drv, sizeof(rf69_irqflags2_data), sizeof(rf69_irqflags2_cmd),
+                            rf69_irqflags2_data, rf69_irqflags2_cmd, rf69_spi_int_cb, NULL);
     }
 
     return 0;
 }
 
+void rf69_dio0_int(void *arg) {
+    spi_drv_t *drv = (spi_drv_t *)arg;
+
+    // Disable external interrupt
+    eic_int_disable(rf69_intnum);
+
+    rf69_ints++;
+
+    rf69_mode_irqflags2(drv);
+}
+
+// Interrupt handler for the external RF interrupt line, transmit complete, and new rx
 int rf69_tx(spi_drv_t *spi_drv,
             uint8_t dst, uint8_t src,
             uint8_t dport, uint8_t sport,
@@ -628,48 +796,24 @@ int rf69_tx(spi_drv_t *spi_drv,
 
     irq_state = irq_save();
     rfbuf_append(&rfbuf_txlist, buf);
+    irq_restore(irq_state);
 
     // TODO:  Check for CRC interrupt with spi active state and don't try to switch state till
     //        complete
-    if (rf69_state != RF69_STATE_TX)
+    if (rf69_state == RF69_STATE_LISTEN)
     {
         // We have to turn on the TX state before we queue a packet if we want to get the
         // transmit complete interrupt.  Kinda lame.
-        rf69_state = RF69_STATE_TX;
         rf69_mode_tx(spi_drv);
     }
-    irq_restore(irq_state);
 
     return 0;
 }
 
-int rf69_regs_init(spi_drv_t *spi_drv, rf69_reg_init_t *reglist, int listlen)
-{
-    uint8_t txbuf[RF69_REG_LIST_DATA_MAX];
-    int i;
-
-    for (i = 0; i < listlen; i++)
-    {
-        rf69_reg_init_t *reg = &reglist[i];
-
-        txbuf[0] = RFM69_REG_WRITE(reg->addr);
-        memcpy(&txbuf[1], reg->data, reg->len);
-
-        if (spi_transfer(spi_drv, reg->len + 1, NULL, txbuf, NULL, NULL))
-        {
-            return -1;
-        }
-
-        spi_wait(spi_drv);
-    }
-
-    rf69_state = RF69_STATE_LISTEN;
-    rf69_mode_stdby(spi_drv);
-
-    return 0;
-}
-
-int cmd_rf69(console_t *console, int argc, char *argv[])
+//
+// Console debug
+//
+int cmd_rf69_regs(console_t *console, int argc, char *argv[])
 {
     int i;
 
@@ -682,7 +826,7 @@ int cmd_rf69(console_t *console, int argc, char *argv[])
 
         while (done == -1)
         {
-            done = spi_transfer(rf69_drv, sizeof(txdata), rxdata, txdata, NULL, NULL);
+            done = spi_transfer(rf69_drv, sizeof(rxdata), sizeof(txdata), rxdata, txdata, NULL, NULL);
             spi_wait(rf69_drv);
         }
 
@@ -694,11 +838,75 @@ int cmd_rf69(console_t *console, int argc, char *argv[])
     return 0;
 }
 
-int rf69_init(spi_drv_t *spi_drv, rfbuf_t *freelist, rf69_spi_pkt_t *pktlist, int len)
+int cmd_rf69_stats(console_t *console, int argc, char *argv[])
+{
+    console_print(console, "Stats:\r\n");
+    console_print(console, "  IRQ Count : %d\r\n", rf69_ints);
+    console_print(console, "  TX Count  : %d\r\n", rf69_txcount);
+    console_print(console, "  RX Count  : %d\r\n", rf69_rxcount);
+
+    return 0;
+}
+
+int cmd_rf69(console_t *console, int argc, char *argv[])
+{
+    if (argc < 2)
+    {
+        cmd_help_usage(console, argv[0]);
+        return 0;
+    }
+
+    if ((argc == 2) && (!strcmp(argv[1], "regs")))
+    {
+        return cmd_rf69_regs(console, argc, argv);
+    }
+    else if ((argc == 2) && (!strcmp(argv[1], "stats")))
+    {
+        return cmd_rf69_stats(console, argc, argv);
+    }
+    else
+    {
+        cmd_help_usage(console, argv[0]);
+    }
+
+    return 0;
+}
+
+//
+// Initialization
+//
+int rf69_regs_init(spi_drv_t *spi_drv, rf69_reg_init_t *reglist, int listlen)
+{
+    uint8_t txbuf[RF69_REG_LIST_DATA_MAX];
+    int i;
+
+    for (i = 0; i < listlen; i++)
+    {
+        rf69_reg_init_t *reg = &reglist[i];
+
+        txbuf[0] = RFM69_REG_WRITE(reg->addr);
+        memcpy(&txbuf[1], reg->data, reg->len);
+
+        if (spi_transfer(spi_drv, 0, reg->len + 1, NULL, txbuf, NULL, NULL))
+        {
+            return -1;
+        }
+
+        spi_wait(spi_drv);
+    }
+
+    rf69_mode_rx(spi_drv);
+    spi_wait(spi_drv);
+
+    return 0;
+}
+
+int rf69_init(spi_drv_t *spi_drv, rfbuf_t *freelist, rf69_spi_pkt_t *pktlist, int len, uint8_t intnum)
 {
     int i;
 
     rf69_drv = spi_drv;
+    rf69_intnum = intnum;
 
     // Setup the packet buffer free list based on the passed in array
     for (i = 0; i < len; i++) {

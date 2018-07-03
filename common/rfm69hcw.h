@@ -109,6 +109,13 @@
 
 #define RFM69_REG_IRQFLAGS1                      0x27
 #define RFM69_REG_IRQFLAGS2                      0x28
+#define RFM69_REG_IRQFLAGS2_FIFOFULL             (1 << 7)
+#define RFM69_REG_IRQFLAGS2_FIFONOTEMPY          (1 << 6)
+#define RFM69_REG_IRQFLAGS2_FIFOLEVEL            (1 << 5)
+#define RFM69_REG_IRQFLAGS2_FIFOOVERRUN          (1 << 4)
+#define RFM69_REG_IRQFLAGS2_PACKETSENT           (1 << 3)
+#define RFM69_REG_IRQFLAGS2_PAYLOADREADY         (1 << 2)
+#define RFM69_REG_IRQFLAGS2_CRCOK                (1 << 1)
 
 #define RFM69_REG_RSSITHRESH                     0x29
 
@@ -133,6 +140,7 @@
 #define RFM69_REG_PACKETCONFIG1_DCFREE_WHITEN    (0x2 << 5)
 #define RFM69_REG_PACKETCONFIG1_CRCON            (1 << 4)
 #define RFM69_REG_PACKETCONFIG1_ADDR_NODEBCAST   (0x2 << 1)
+#define RFM69_REG_PACKETCONFIG1_ADDR_NONE        (0x0 << 1)
 
 #define RFM69_REG_PAYLOADLENGTH                  0x38
 #define RFM69_REG_NODEADRS                       0x39
@@ -222,15 +230,17 @@ int cmd_rf69(console_t *console, int argc, char *argv[]);
     {                                             \
         .cmdstr = "rf",                           \
         .callback = cmd_rf69,                     \
-        .usage = "  rf\r\n",                      \
+        .usage = "  rf <stats> <regs>\r\n",       \
         .help =                                   \
             "  RFM69HCW Registers\r\n"            \
+            "    stats : Show statistics\r\n"     \
+            "    regs  : Show hardware regs\r\n"     \
     }
 
 
 void rf69_dio0_int(void *arg);
 int rf69_regs_init(spi_drv_t *spi_drv, rf69_reg_init_t *reglist, int listlen);
-int rf69_init(spi_drv_t *spi_drv, rfbuf_t *freelist, rf69_spi_pkt_t *pktlist, int num);
+int rf69_init(spi_drv_t *spi_drv, rfbuf_t *freelist, rf69_spi_pkt_t *pktlist, int num, uint8_t intnum);
 
 int rf69_mode_rx(spi_drv_t *spi_drv);
 int rf69_mode_tx(spi_drv_t *spi_drv);

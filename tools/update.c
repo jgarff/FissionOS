@@ -54,19 +54,27 @@
 #define FLASH_PAGE_SIZE                           64
 
 
+typedef struct {
+    char *filename;
+    uint8_t bus;
+    uint8_t device;
+} arg_t;
+
 typedef int (callback_t)(char *arg);
 
-static struct libusb_device_handle *usbdev = NULL;
-static struct libusb_context *usbcontext;
+static struct libusb_device_handle *usbdev;
 
-char *short_opts = "a:bru:i";
+char *short_opts = "d:bru:i";
 
 void usage(char *argv0)
 {
     printf("\n");
-    printf("%s: [command]\n", argv0);
+    printf("%s: [-d <bus:device>] <command>\n", argv0);
     printf("\n");
-    printf("Local USB Commands (no ipv6 address):\n");
+    printf("Arguments:\n");
+    printf("    -d <bus:device> Specify the exact device\n");
+    printf("\n");
+    printf("Commands :\n");
     printf("    -i              Device Information\n");
     printf("    -b              Reset Device to Bootloader\n");
     printf("    -r              Reset Device\n");
@@ -79,52 +87,104 @@ void usage(char *argv0)
  * USB Functions
  */
 
-struct libusb_device_handle *dev_open(void)
+int dev_open(struct libusb_device_handle **dev, int bus, int device)
 {
-    struct libusb_device_handle *dev;
+    struct libusb_device **devs;
+    struct libusb_device_descriptor info;
+    unsigned count, i;
 
-    if (libusb_init(&usbcontext))
+    *dev = NULL;
+
+    if (libusb_init(NULL))
     {
         fprintf(stderr, "libusb_init failed\n");
-        return NULL;
+
+        return -1;
     }
 
-    dev = libusb_open_device_with_vid_pid(usbcontext, 0x0011, 0x0101);
-    if (!dev)
+      // get list of devices and counts
+    count = libusb_get_device_list(NULL, &devs);
+    if (count <= 0)
     {
-        fprintf(stderr, "No device found\n");
-        libusb_exit(usbcontext);
-        return NULL;
+        fprintf(stderr, "Error enumerating devices\n");
+        return -1;
     }
 
-    libusb_detach_kernel_driver(dev, 0);
-    if (libusb_claim_interface(dev, 0))
+    // walk the list, read descriptors, and dump some output from each
+    for (i = 0; i < count; i++)
     {
-        libusb_close(dev);
-        libusb_exit(usbcontext);
-        return NULL;
+        libusb_get_device_descriptor(devs[i], &info);
+
+        if ((info.idVendor == 0x0011) &&
+            (info.idProduct == 0x0101))
+        {
+            if (bus)
+            {
+                uint8_t bus_number = libusb_get_bus_number(devs[i]);
+                uint8_t device_addr = libusb_get_device_address(devs[i]);
+
+                // If the user specified a device, check to see if this is it.
+                // Continue looking if not.
+                if ((bus_number != bus) ||
+                    (device_addr != device))
+                {
+                    continue;
+                }
+            }
+
+            int err = libusb_open(devs[i], dev);
+            if (err) {
+                fprintf(stderr, "Unable to open device\n");
+
+                libusb_free_device_list(devs, 1);
+                libusb_exit(NULL);
+
+                return -1;
+            }
+
+            break;
+        }
+    }
+   
+    libusb_free_device_list(devs, 1);
+
+    // No matching device
+    if (i == count)
+    {
+        libusb_exit(NULL);
+        return -1;
     }
 
-    return dev;
+    libusb_detach_kernel_driver(*dev, 0);
+    if (libusb_claim_interface(*dev, 0))
+    {
+        libusb_close(*dev);
+        libusb_exit(NULL);
+
+        return -1;
+    }
+
+    return 0;
 }
 
-void dev_close(struct libusb_device_handle *dev)
+void dev_close(struct libusb_device_handle **dev)
 {
-    libusb_attach_kernel_driver(dev, 0);
-    libusb_close(dev);
-    libusb_exit(usbcontext);
+    libusb_release_interface(*dev, 0);
+    libusb_attach_kernel_driver(*dev, 0);
+    libusb_close(*dev);
+    libusb_exit(NULL);
 }
 
 int get_device(char *arg)
 {
-	device_info_t device_info;
+    device_info_t device_info;
     int result;
 
     result = libusb_control_transfer(usbdev,
-                                LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR |
-                                LIBUSB_RECIPIENT_DEVICE,
-                                USB_VENDOR_REQUEST_INFO, 0, 0,
-                                (uint8_t *)&device_info, sizeof(device_info), 0);
+                                     LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR |
+                                     LIBUSB_RECIPIENT_DEVICE,
+                                     USB_VENDOR_REQUEST_INFO, 0, 0,
+                                     (uint8_t *)&device_info, sizeof(device_info), 0);
     if (result != sizeof(device_info))
     {
         fprintf(stderr, "libusb_control_transfer failed %d\n", result);
@@ -322,37 +382,71 @@ int update(char *arg)
     return -1;
 }
 
-int usb_command(callback_t *callback, char *arg)
+int usb_command(callback_t *callback, arg_t *arg)
 {
     int ret;
 
-    usbdev = dev_open();
-    if (!usbdev)
+    ret = dev_open(&usbdev, arg->bus, arg->device);
+    if (ret)
     {
         printf("Device not found\n");
-        return 0;
+
+        return ret;
     }
 
-    ret = callback(arg); 
+    ret = callback(arg->filename); 
 
-    dev_close(usbdev);
+    dev_close(&usbdev);
 
     return ret;
+}
+
+void strtodev(char *s, arg_t *arg)
+{
+    char *bus_str = s;
+    char *dev_str = NULL;
+
+    arg->bus = 0;
+    arg->device = 0;
+
+    while (*s)
+    {
+        if (*s == ':')
+        {
+            *s++ = 0;
+            dev_str = s;
+
+            break;
+        }
+        else
+        {
+            s++;
+        }
+    }
+
+    if (strlen(bus_str) && strlen(dev_str))
+    {
+        arg->bus = strtoul(bus_str, NULL, 0);
+        arg->device = strtoul(dev_str, NULL, 0);
+    }
 }
 
 int main(int argc, char *argv[])
 {
     callback_t *callback = NULL;
-    char *addr = NULL;
-    char *arg = NULL;
+    arg_t arg = {
+        .filename = NULL,
+        .bus = 0,
+        .device = 0,
+    };
     int opt;
 
     while ((opt = getopt(argc, argv, short_opts)) != -1)
     {
         switch (opt)
         {
-            case 'a':
-                addr = optarg;
+            case 'd':
+                strtodev(optarg, &arg);
                 break;
 
             case 'i':
@@ -369,7 +463,7 @@ int main(int argc, char *argv[])
 
             case 'u':
                 callback = update;
-                arg = optarg;
+                arg.filename = optarg;
                 break;
 
             case 'h':
@@ -387,12 +481,7 @@ int main(int argc, char *argv[])
     }
 
     // Local commands
-    if (!addr)
-    {
-        return usb_command(callback, arg);
-    }
-
-    return 0;
+    return usb_command(callback, &arg);
 }
 
 

@@ -4,7 +4,10 @@ ENTRY(reset_handler)
 
 MEMORY
 {
-    flash  (rx)  : ORIGIN = 0x00008080, LENGTH = 229248,  /* 224k - 128b for imghdr */
+/*    /* 224k - 128b for imghdr */
+/*    flash  (rx)  : ORIGIN = 0x00008080, LENGTH = 229248,
+    sram   (rwx) : ORIGIN = 0x20000000, LENGTH = 32K */
+    flash  (rx)  : ORIGIN = 0x00000000, LENGTH = 256K,
     sram   (rwx) : ORIGIN = 0x20000000, LENGTH = 32K
 }
 

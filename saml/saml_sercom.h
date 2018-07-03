@@ -308,7 +308,7 @@ typedef volatile struct sercom_spi
 } sercom_spi_t;
 
 struct spi_drv;
-typedef void (*spi_callback_t)(struct spi_drv *drv, int len,
+typedef void (*spi_callback_t)(struct spi_drv *drv, int rxlen, int txlen,
                                uint8_t *rxbuf, uint8_t *txbuf,
                                void *arg);
 typedef struct spi_drv
@@ -320,7 +320,8 @@ typedef struct spi_drv
     uint8_t sspin;
     spi_callback_t cb;
     void *arg;
-    int xferlen;
+    int rxlen;
+    int txlen;
     int len;
     uint8_t *txbuf;
     uint8_t *rxbuf;
@@ -336,7 +337,7 @@ spi_drv_t *spi_master_init(int devnum,
                           uint8_t dipo,
                           uint8_t dopo,
                           int32_t form);
-int spi_transfer(spi_drv_t *drv, int len,
+int spi_transfer(spi_drv_t *drv, int rxlen, int txlen,
                  uint8_t *rxbuf, uint8_t *txbuf,
                  spi_callback_t cb, void *arg);
 void spi_wait(spi_drv_t *drv);

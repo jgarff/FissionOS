@@ -38,6 +38,7 @@
 #include <vectors.h>
 
 #include "saml_port.h"
+#include "saml_arch.h"
 
 #include "saml_sercom.h"
 
@@ -59,13 +60,13 @@ static void spi_wq_handler(void *arg)
 
     if (drv->cb)
     {
-        drv->cb(drv, drv->len, drv->rxbuf, drv->txbuf, drv->arg);
+        drv->cb(drv, drv->rxlen, drv->txlen, drv->rxbuf, drv->txbuf, drv->arg);
     }
 }
 
 static void sercom_spi_int_handler(spi_drv_t *drv)
 {
-    if (drv->rxbuf)
+    if (drv->rxbuf && (drv->len < drv->rxlen))
     {
         drv->rxbuf[drv->len] = drv->dev->data;
     }
@@ -75,7 +76,8 @@ static void sercom_spi_int_handler(spi_drv_t *drv)
     }
     drv->len++;
 
-    if (drv->len >= drv->xferlen)
+    if ((drv->len >= drv->txlen) &&
+        (drv->len >= drv->rxlen))
     {
         port_set(drv->ssport, drv->sspin, 1);
         drv->state = SPI_STATE_IDLE;
@@ -88,12 +90,18 @@ static void sercom_spi_int_handler(spi_drv_t *drv)
         return;
     }
 
-    drv->dev->data = drv->txbuf[drv->len];
+    if (drv->txbuf && (drv->len < drv->txlen))
+    {
+        write16(&drv->dev->data, drv->txbuf[drv->len]);
+    } else {
+        write16(&drv->dev->data, 0);
+    }
 }
 
 void spi_wait(spi_drv_t *drv)
 {
-    while (drv->len < drv->xferlen)
+    while ((drv->len < drv->rxlen) &&
+           (drv->len < drv->txlen))
         ;
 }
 
@@ -161,9 +169,9 @@ const spi_map_t spi_map[] = {
     },
 };
 
-int spi_transfer(spi_drv_t *drv, int len,
-                        uint8_t *rxbuf, uint8_t *txbuf,
-                        spi_callback_t cb, void *arg)
+int spi_transfer(spi_drv_t *drv, int rxlen, int txlen,
+                 uint8_t *rxbuf, uint8_t *txbuf,
+                 spi_callback_t cb, void *arg)
 {
     uint32_t irq_state = irq_save();
 
@@ -177,7 +185,8 @@ int spi_transfer(spi_drv_t *drv, int len,
 
     irq_restore(irq_state);
 
-    drv->xferlen = len;
+    drv->rxlen = rxlen;
+    drv->txlen = txlen;
     drv->len = 0;
     drv->cb = cb;
     drv->arg = arg;
@@ -187,9 +196,16 @@ int spi_transfer(spi_drv_t *drv, int len,
 
     port_set(drv->ssport, drv->sspin, 0);
 
-    if (drv->xferlen)
+    if (drv->txlen || drv->rxlen)
     {
-        drv->dev->data = txbuf[0];
+        if (drv->txlen)
+        {
+            drv->dev->data = txbuf[0];
+        }
+        else
+        {
+            drv->dev->data = 0;
+        }
     }
     else
     {
@@ -198,7 +214,7 @@ int spi_transfer(spi_drv_t *drv, int len,
 
         if (drv->cb)
         {
-            drv->cb(drv, len, rxbuf, txbuf, arg);
+            drv->cb(drv, drv->rxlen, drv->txlen, rxbuf, txbuf, arg);
         }
     }
 

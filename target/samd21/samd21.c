@@ -217,6 +217,7 @@ uint8_t rssithresh[] = { 0xe4 };
 uint8_t syncvalue[] = RF69_NETWORK_ID;
 uint8_t fifothresh[] = { RFM69_REG_FIFOTHRESH_TXSTARTCONDITION |
                          RFM69_REG_FIFOTHRESH_FIFOTHRESHOLD(0xf) };
+uint8_t bcastaddr[] = { 0xff };
 uint8_t testdagc[] = { 0x30 };
 uint8_t lna[] = { RFM69_REG_LNA_ZIN };
 uint8_t packetconfig1[] = { RFM69_REG_PACKETCONFIG1_PACKETFORMAT | 
@@ -270,6 +271,11 @@ rf69_reg_init_t rf69_regs[] = {
         .data = packetconfig1,
         .len = sizeof(packetconfig1),
     },
+    {
+        .addr = RFM69_REG_BROADCASTADRS,
+        .data = bcastaddr,
+        .len  = sizeof(bcastaddr),
+    },
 };
 
 void rf_worker(void *arg);
@@ -304,13 +310,12 @@ void rf_worker(void *arg)
 
         case RF_WORKER_TX:
             rf69_tx(&spi_drv, RF69_BROADCAST_ADDR, 1, 0, 0, NULL, 0, NULL, NULL);
-            workqueue_add(&rf_wq, SYSTICK_FREQ / 10);
+            workqueue_add(&rf_wq, SYSTICK_FREQ / 2);
             return;
 
         default:
             return;
     }
-
 
     workqueue_add(&rf_wq, SYSTICK_FREQ);
 }
@@ -373,6 +378,15 @@ int main(int argc, char *argv[])
     port_set(RFRST_N_PORT, RFRST_N_PIN, 0);
 
     //
+    // Setup RF external interrupt
+    //
+    PM->apbamask |= PM_APBAMASK_EIC;
+    gclk_peripheral_enable(GCLK0, GCLK_EIC);
+    port_peripheral_enable(DIO0_PORT, DIO0_PIN, DIO0_MUX);
+    port_dir(DIO0_PORT, DIO0_PIN, 0);
+    eic_int_setup(DIO0_INTNUM, &dio0, EIC_LEVEL_HIGH);
+
+    //
     // Setup SPI
     //
     PM->apbcmask |= PM_APBCMASK_SERCOM3;
@@ -388,17 +402,8 @@ int main(int argc, char *argv[])
                            SPI_SS_PORT, SPI_SS_PIN,
                            SPI_DIPO, SPI_DOPO,
                            SPI_FORM);
-    rf69_init(&spi_drv, rfbufs, rfpktbufs, ARRAY_SIZE(rfbufs));
 
-    //
-    // Setup RF external interrupt
-    //
-    PM->apbamask |= PM_APBAMASK_EIC;
-    gclk_peripheral_enable(GCLK0, GCLK_EIC);
-    port_peripheral_enable(DIO0_PORT, DIO0_PIN, DIO0_MUX);
-    port_dir(DIO0_PORT, DIO0_PIN, 0);
-    eic_int_setup(DIO0_INTNUM, &dio0, EIC_EDGE_RISE);
-    eic_int_enable(DIO0_INTNUM);
+    rf69_init(&spi_drv, rfbufs, rfpktbufs, ARRAY_SIZE(rfbufs), DIO0_INTNUM);
 
     //
     // Setup external interrupts
