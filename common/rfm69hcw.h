@@ -185,6 +185,9 @@
 #define RF69_NETWORK_ID                          { 0x1e, 0x2f, 0x3a, 0x4b, 0x5c, 0x6d, 0x7e, 0x8f }
 #define RF69_BROADCAST_ADDR                      0xff
 
+//
+// Register initialization list format
+//
 typedef struct {
     uint8_t len;
     uint8_t addr;
@@ -193,7 +196,21 @@ typedef struct {
 
 #define RF69_REG_LIST_DATA_MAX                   16
 
-typedef void (*rf69_tx_cb_t)(void *arg);
+//
+// Packet Formats
+//
+
+// Key/Value
+typedef struct {
+    uint16_t key;
+    uint8_t flags;
+#define RF69_KV_FLAGS_GET                       (0 << 1)
+#define RF69_KV_FLAGS_SET                       (1 << 1)
+    uint8_t len;
+    uint8_t value[0];
+} __attribute__ ((packed)) rf69_kv_t;
+
+// Base Packet Header
 typedef struct {
     uint8_t len;
     uint8_t dst;
@@ -204,17 +221,25 @@ typedef struct {
 #define RF69_PKT_HEADER_SEQ(val)                 (val & RF69_PKT_HEADER_SEQ_MAX)
     uint8_t dport;
     uint8_t sport;
+    uint8_t data[0];
 } __attribute__ ((packed)) rf69_pkt_header_t;
 
 #define RF69_PKT_MAX                             66
 #define RF69_PKT_MAX_DATA                        (RF69_PKT_MAX - sizeof(rf69_pkt_header_t))
 
+//
+// Packet buffer format for SPI transfer
+//
 typedef struct {
     uint8_t reg;
     rf69_pkt_header_t hdr;
-    uint8_t data[RF69_PKT_MAX_DATA];
+    uint8_t data[RF69_PKT_MAX_DATA];  // This allocates for data in rf69_pkt_header_t
 } __attribute__ ((packed)) rf69_spi_pkt_t;
 
+//
+// Buffer Descriptor
+//
+typedef void (*rf69_tx_cb_t)(void *arg);
 typedef struct rfbuf {
     volatile struct rfbuf *next;
     volatile struct rfbuf *prev;
@@ -225,6 +250,9 @@ typedef struct rfbuf {
 } rfbuf_t;
 
 
+//
+// Console debug
+//
 int cmd_rf69(console_t *console, int argc, char *argv[]);
 #define CONSOLE_CMD_RF                            \
     {                                             \
@@ -237,6 +265,10 @@ int cmd_rf69(console_t *console, int argc, char *argv[]);
             "    regs  : Show hardware regs\r\n"     \
     }
 
+
+//
+// API
+//
 
 void rf69_dio0_int(void *arg);
 int rf69_regs_init(spi_drv_t *spi_drv, rf69_reg_init_t *reglist, int listlen);
