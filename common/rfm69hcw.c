@@ -945,11 +945,18 @@ int rf69_tx(spi_drv_t *spi_drv,
 
     rfbuf_append(&rfbuf_txlist, buf);
 
-    if (rf69_state == RF69_STATE_LISTEN)
+    switch (rf69_state)
     {
-        // We have to turn on the TX state before we queue a packet if we want to get the
-        // transmit complete interrupt.  Kinda lame.
-        rf69_mode_tx(spi_drv);
+        case RF69_STATE_IDLE:
+        case RF69_STATE_LISTEN:
+        case RF69_STATE_STDBY:
+            // We have to turn on the TX state before we queue a packet if we want to get the
+            // transmit complete interrupt.  Kinda lame.
+            rf69_mode_tx(spi_drv);
+            break;
+
+        default:
+            break;
     }
 
     return 0;
