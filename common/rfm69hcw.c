@@ -59,6 +59,10 @@
 //
 // Issues:
 //
+// TODO:
+// - Allocate RX buffer every time we go into LISTEN mode.
+//   If no buffer is available, put RF to sleep.
+//   On buffer free, attempt to enter LISTEN mode again as above, and try again to get a buffer.
 //
 
 //
@@ -88,6 +92,8 @@ uint32_t rf69_txcount = 0;
 uint32_t rf69_rxcount = 0;
 uint32_t rf69_ints = 0;
 
+volatile rfbuf_t *rf69_rxbuf = NULL;
+
 volatile rfbuf_t rfbuf_freelist = {
     .next = &rfbuf_freelist,
     .prev = &rfbuf_freelist,
@@ -95,10 +101,6 @@ volatile rfbuf_t rfbuf_freelist = {
 volatile rfbuf_t rfbuf_txlist = {
     .next = &rfbuf_txlist,
     .prev = &rfbuf_txlist,
-};
-volatile rfbuf_t rfbuf_rxlist = {
-    .next = &rfbuf_rxlist,
-    .prev = &rfbuf_rxlist,
 };
 
 // For debug console command
@@ -463,21 +465,34 @@ int rfbuf_empty(void)
 
 volatile rfbuf_t *rfbuf_alloc(void)
 {
-    volatile rfbuf_t *entry = rfbuf_freelist.next;
+    volatile rfbuf_t *entry;
+    uint32_t irq_state;
 
+    irq_state = irq_save();
+    entry = rfbuf_freelist.next;
     if (entry->next == entry)
     {
+        irq_restore(irq_state);
         return NULL;
     }
 
     rfbuf_unlink(entry);
+
+    irq_restore(irq_state);
 
     return entry;
 }
 
 void rfbuf_free(volatile rfbuf_t *entry)
 {
+    uint32_t irq_state = irq_save();
     rfbuf_append(&rfbuf_freelist, entry);
+    irq_restore(irq_state);
+
+    if (rf69_state == RF69_STATE_IDLE)
+    {
+        rf69_mode_rx(rf69_drv);
+    }
 }
 
 
@@ -494,7 +509,7 @@ int rf69_mode_stdby(spi_drv_t *spi_drv)
 
     while (done == -1)
     {
-        done = spi_transfer(spi_drv, 0, sizeof(rf69_stbycmd), NULL, rf69_stbycmd, NULL, NULL);
+        done = spi_transfer(spi_drv, 0, sizeof(rf69_stbycmd), NULL, rf69_stbycmd, rf69_spi_cb, NULL);
     }
 
     return 0;
@@ -526,6 +541,20 @@ int rf69_mode_rx(spi_drv_t *spi_drv)
     int done = -1;
 
     irq_state = irq_save();
+    if (!rf69_rxbuf)
+    {
+        rf69_rxbuf = rfbuf_alloc();
+        if (!rf69_rxbuf)
+        {
+            rf69_state = RF69_STATE_IDLE;
+            irq_restore(irq_state);
+
+            rf69_mode_stdby(spi_drv);
+
+            return 0;
+        }
+    }
+
     rf69_state = RF69_STATE_MODE_RX;
     irq_restore(irq_state);
 
@@ -612,7 +641,6 @@ void rf69_spi_cb(spi_drv_t *drv, int rxlen, int txlen, uint8_t *rxbuf, uint8_t *
 {
     uint32_t irq_state;
     volatile rfbuf_t *txentry = rfbuf_txlist.next;
-    volatile rfbuf_t *rxentry = rfbuf_rxlist.next;
 
     irq_state = irq_save();
 
@@ -634,12 +662,19 @@ void rf69_spi_cb(spi_drv_t *drv, int rxlen, int txlen, uint8_t *rxbuf, uint8_t *
 
         case RF69_STATE_RX:
             rf69_state = RF69_STATE_LISTEN;
-            if (rxentry->next != rxentry)
-            {
-                rfbuf_unlink(rxentry);
+            if (rf69_rxbuf) {
+                rfbuf_unlink(rf69_rxbuf);
                 // TODO:  Packet parsing
-                rfbuf_free(rxentry);
+                rfbuf_free(rf69_rxbuf);
+
                 rf69_rxcount++;
+
+                rf69_rxbuf = rfbuf_alloc();
+                if (!rf69_rxbuf)
+                {
+                    rf69_state = RF69_STATE_IDLE;
+                    rf69_mode_stdby(drv);
+                }
             }
 
             // Check to see if we got a transmit queued when we were changing modes
@@ -665,24 +700,23 @@ void rf69_spi_cb(spi_drv_t *drv, int rxlen, int txlen, uint8_t *rxbuf, uint8_t *
 void rf69_rx_handler(spi_drv_t *spi_drv)
 {
     uint32_t irq_state;
-    volatile rfbuf_t *buf;
     rf69_spi_pkt_t *pkt;
 
     irq_state = irq_save();
-    buf = rfbuf_alloc();
-    if (!buf)
+    if (!rf69_rxbuf)
     {
+        // We should never be in a position to receive packets without a buffer in IDLE mode
+        while(1);
+
         irq_restore(irq_state);
         return;
     }
     rf69_state = RF69_STATE_RX;
     irq_restore(irq_state);
 
-    pkt = buf->pkt;
+    pkt = rf69_rxbuf->pkt;
     pkt->reg = RFM69_REG_READ(RFM69_REG_FIFO);
 
-    rfbuf_append(&rfbuf_rxlist, buf);
-    
     spi_transfer(spi_drv, sizeof(*pkt), 1, (uint8_t *)pkt, (uint8_t *)pkt, rf69_spi_cb, NULL);
 }
 
