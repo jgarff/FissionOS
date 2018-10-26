@@ -35,6 +35,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "usb_messages.h"
 #include "usb_config.h"
@@ -42,22 +43,36 @@
 #include "product.h"
 
 
+// Serial number runtime fixup
+typedef struct {
+    uint8_t length;
+    uint8_t type;
+    uint8_t serial[32];
+} __attribute__ ((packed)) usb_desc_string_serial_t;
+
 #define USB_STR_LANG        { 0x09, 0x04 }  // Little endian 0x0409, English
 USB_STR_DESC(usb_str_lang, USB_STR_LANG, 2);
 
-#define USB_STR_VENDOR      { 'T', 0, 'e', 0, 's', 0, 't', 0, }  // Unicode
+#define USB_STR_VENDOR      { 'T', 0, 'e', 0, 's', 0, 't', 0 }  // Unicode
 USB_STR_DESC(usb_str_vendor, USB_STR_VENDOR, 8);
 
 #define USB_STR_PRODUCT     { 'T', 0, 'e', 0, 's', 0, 't', 0 }
 USB_STR_DESC(usb_str_product, USB_STR_PRODUCT, 8);
 
-usb_desc_string_t *usb_str_desc[] = 
+usb_desc_string_serial_t usb_serial_desc =
 {
-    &usb_str_lang,    // String Index 0, Supported Languages
-    &usb_str_vendor,  // String Index 1
-    &usb_str_product  // String Index 2
+    .length = 0,
+    .type   = USB_DESC_TYPE_STRING,
+    .serial = { 0 },
 };
 
+usb_desc_string_t *usb_str_desc[] = 
+{
+    &usb_str_lang,                         // String Index 0, Supported Languages
+    &usb_str_vendor,                       // String Index 1
+    &usb_str_product,                      // String Index 2
+    (usb_desc_string_t *)&usb_serial_desc, // String Index 3
+};
 
 // Main device descriptor
 usb_desc_device_t usb_desc = 
@@ -75,7 +90,7 @@ usb_desc_device_t usb_desc =
 
     .vendor_str_index      = 1,
     .product_str_index     = 2,
-    .serial_str_index      = 0,
+    .serial_str_index      = 3,
 
     .num_configs           = 1
 };
@@ -178,4 +193,43 @@ usb_desc_config_all_t usb_config =
 };
 uint32_t usb_config_len = sizeof(usb_config);
 
+
+void usb_serial_fixup(uint64_t serial)
+{
+    int i, j = 0, start = 0;
+
+    for (i = 0; i < sizeof(serial); i++)
+    {
+        uint8_t bserial = ((uint8_t *)&serial)[(sizeof(serial) - 1) - i];
+        uint8_t tmp;
+
+        if (!bserial && !start) {
+            continue;
+        }
+
+        start = 1;
+
+        tmp = bserial >> 4;
+        if (tmp < 0xa)
+        {
+            tmp = tmp + '0';
+        } else {
+            tmp = (tmp - 0xa) + 'a';
+        }
+        usb_serial_desc.serial[j++] = tmp;
+        usb_serial_desc.serial[j++] = 0;
+
+        tmp = bserial & 0xf;
+        if (tmp < 0xa)
+        {
+            tmp = tmp + '0';
+        } else {
+            tmp = (tmp - 0xa) + 'a';
+        }
+        usb_serial_desc.serial[j++] = tmp;
+        usb_serial_desc.serial[j++] = 0;
+    }
+
+    usb_serial_desc.length = j + sizeof(usb_desc_string_t);
+}
 

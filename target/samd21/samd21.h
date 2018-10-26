@@ -37,6 +37,9 @@
 #define __SAMD_H__
 
 
+#include <fwheader.h>
+
+
 #define GCLK0_HZ                                 48000000
 #define GCLK0                                    0
 #define GCLK1                                    1
@@ -102,6 +105,19 @@
                                                                        sizeof(uint32_t))
 #define RESET_CONFIG                             ((volatile uint32_t *)RESET_CONFIG_ADDR)
 
+#define CONFIG_SIZE                              (NVM_PAGE_SIZE * NVM_PAGES_PER_ROW)
+#define CONFIG_ADDR                              (FLASH_SIZE - CONFIG_SIZE)
 
+typedef struct {
+    uint32_t magic;
+    version_t version;
+    uint32_t flags;
+    uint64_t serial;
+    uint32_t crc;
+} __attribute__((packed)) device_config_t;
+
+#define CONFIG                                   ((device_config_t *)CONFIG_ADDR)
+
+void usb_serial_fixup(uint64_t serial);
 
 #endif /* __SAMD_H__ */

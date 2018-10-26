@@ -56,6 +56,7 @@
 
 #define FLASH_STATE_NONE                         0
 #define FLASH_STATE_APP                          1
+#define FLASH_STATE_CONFIG                       2
 
 #define WORKER_TYPE_NONE                         0
 #define WORKER_TYPE_RESET_APP                    1
@@ -133,12 +134,23 @@ static void rx_vendor_setup(usb_endpoint_entry_t *ep, usb_request_t *req)
             flash_state = FLASH_STATE_APP;
 
             break;
+
+        case USB_VENDOR_REQUEST_CONFIG:
+            page_addr = (((uint32_t)req->value[0] << 24) |
+                        ((uint32_t)req->value[1] << 16) |
+                        (uint32_t)req->index);
+            page_offset = 0;
+
+            flash_state = FLASH_STATE_CONFIG;
+
+            break;
     }
 }
 
 static uint16_t rx_vendor_out(usb_endpoint_entry_t *ep)
 {
-    uint32_t addr = BOOTLOADER_SIZE + page_addr + page_offset;
+    uint32_t flash_addr = BOOTLOADER_SIZE + page_addr + page_offset;
+    uint32_t config_addr = CONFIG_ADDR + page_addr + page_offset;
     char buf[NVM_PAGE_SIZE];
 	int len;
 
@@ -148,7 +160,16 @@ static uint16_t rx_vendor_out(usb_endpoint_entry_t *ep)
         case FLASH_STATE_APP:
             if (len >= 0)
             {
-                nvm_write(addr, (uint8_t *)buf, len);
+                nvm_write(flash_addr, (uint8_t *)buf, len);
+                page_offset += len;
+            }
+
+            break;
+
+        case FLASH_STATE_CONFIG:
+            if (len >= 0)
+            {
+                nvm_write(config_addr, (uint8_t *)buf, len);
                 page_offset += len;
             }
 
@@ -166,6 +187,7 @@ void usb_vendor_init(void)
 {
     device_info.bank = 0;
     device_info.size = FLASH_SIZE;
+    device_info.page_size = NVM_PAGE_SIZE;
     device_info.flags = DEVICE_INFO_FLAGS_BOOTLOADER;
 
     // Register callbacks to handle vendor specific traffic.

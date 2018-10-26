@@ -62,6 +62,9 @@
 #include "samd21.h"
 
 
+int cmd_config(console_t *console, int argc, char *argv[]);
+
+
 volatile uint32_t *reset_config = RESET_CONFIG;
 
 #define RFFREECOUNT                              8
@@ -72,11 +75,48 @@ console_t console;
 
 cmd_entry_t cmd_table[] =
 {
+    {
+        .cmdstr = "config",
+        .callback = cmd_config,
+        .usage = "  config < show >\r\n",
+        .help =
+            "  Device Configuration.\r\n"
+            "    show     : Show the device configuration.\r\n"
+    },
     CONSOLE_CMD_HELP,
     CONSOLE_CMD_RF,
     CONSOLE_CMD_RESET,
     CONSOLE_CMD_USB,
 };
+
+int cmd_config(console_t *console, int argc, char *argv[])
+{
+    if (argc < 2)
+    {
+        cmd_help_usage(console, argv[0]);
+        return 0;
+    }
+
+    if (!strcmp(argv[1], "show"))
+    {
+        console_print(console, "Magic   : %08x\r\n", CONFIG->magic);
+        console_print(console, "Version : %d.%d.%d.%d\r\n",
+                CONFIG->version.major,
+                CONFIG->version.minor,
+                CONFIG->version.micro,
+                CONFIG->version.nano);
+        console_print(console, "Flags   : %08x\r\n", CONFIG->flags);
+        console_print(console, "Serial  : %08x%08x\r\n",
+                ((uint32_t *)&CONFIG->serial)[1],
+                ((uint32_t *)&CONFIG->serial)[0]);
+        console_print(console, "CRC     : %08x\r\n", CONFIG->crc);
+    } else {
+        cmd_help_usage(console, argv[0]);
+        return 0;
+    }
+
+    return 0;
+}
 
 //
 // TODO:  Remove the following place holder functions when suitable functions
@@ -207,6 +247,31 @@ void status_worker(void *arg)
 
 spi_drv_t spi_drv;
 
+rf_port_t rf_ports[4];
+rf_kv_t rf_kvs[1];
+
+void rf_kv_led_send(void)
+{
+    rf_kv_pkt_t kvpkt = {
+        .key = 1,
+        .flags = RF69_KV_FLAGS_SET,
+        .len = 0,
+    };
+
+    rf69_tx(&spi_drv, RF69_BROADCAST_ADDR, 1, 
+            0, 0, 
+            &kvpkt, sizeof(kvpkt),
+            NULL, NULL);
+}
+
+void rf_kv_led_handler(volatile rfbuf_t *buf,
+                       rf69_pkt_header_t *hdr,
+                       rf_kv_pkt_t *kv,
+                       void *arg)
+{
+    rfbuf_free(buf);
+}
+
 uint8_t rssiconfig[] = { RFM69_REG_RSSICONFIG_START };
 uint8_t rxbw[] = { RFM69_REG_RXBW_DCC_FREQ(0x2) | RFM69_REG_RXBW_MANT(0x2) |
                    RFM69_REG_RXBW_EXP(0x5)};
@@ -309,7 +374,7 @@ void rf_worker(void *arg)
             break;
 
         case RF_WORKER_TX:
-            rf69_tx(&spi_drv, RF69_BROADCAST_ADDR, 1, 0, 0, NULL, 0, NULL, NULL);
+            rf_kv_led_send();
             workqueue_add(&rf_wq, SYSTICK_FREQ / 5);
             return;
 
@@ -348,6 +413,8 @@ int main(int argc, char *argv[])
     port_peripheral_enable(USB_DN_PORT, USB_DN_PIN, USB_DN_MUX);
     usb_init();
 
+    // TODO:  Validate the configuration CRC
+    usb_serial_fixup(CONFIG->serial);
     usb_serial_init(usb_console_rx_callback, &console);
     usb_control0_init((char *)&usb_desc, usb_desc_len,
                       (char *)&usb_config, usb_config_len,
@@ -402,6 +469,12 @@ int main(int argc, char *argv[])
                            SPI_SS_PORT, SPI_SS_PIN,
                            SPI_DIPO, SPI_DOPO,
                            SPI_FORM);
+
+    rf_kv_init(rf_kvs, ARRAY_SIZE(rf_kvs));
+    rf_kv_register(1, rf_kv_led_handler, NULL);
+
+    rf_port_init(rf_ports, ARRAY_SIZE(rf_ports));
+    rf_port_register(0, rf_kv_recv, NULL);
 
     rf69_init(&spi_drv, rfbufs, rfpktbufs, ARRAY_SIZE(rfbufs), DIO0_INTNUM);
 

@@ -61,7 +61,6 @@
 // Issues:
 //
 // TODO:
-// - Test RX queue and mode changes when no more free buffers available
 //
 
 //
@@ -686,9 +685,7 @@ void rf69_rx_wq_handler(void *arg)
     rxentry = rfbuf_dequeue(&rfbuf_recvd_list);
     while (rxentry)
     {
-        // ToDo:  Call packet parser, remove the following free.  It's up to the
-        // receiver to free it later.
-        rfbuf_free(rxentry);
+        rf_recv(rxentry);
 
         rxentry = rfbuf_dequeue(&rfbuf_recvd_list);
     }
@@ -904,7 +901,7 @@ int rf69_tx_buf(spi_drv_t *spi_drv,
 int rf69_tx(spi_drv_t *spi_drv,
             uint8_t dst, uint8_t src,
             uint8_t dport, uint8_t sport,
-            uint8_t *data, uint8_t len,
+            void *data, uint8_t len,
             rf69_tx_cb_t cb, void *arg)
 {
     volatile rfbuf_t *buf;

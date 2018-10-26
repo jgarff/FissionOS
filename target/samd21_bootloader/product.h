@@ -55,11 +55,13 @@
 #define USB_VENDOR_REQUEST_INFO                  0x02   // IN
 #define USB_VENDOR_REQUEST_FLASH                 0x03   // OUT
 #define USB_VENDOR_REQUEST_FLASH_DONE            0x04   // OUT
+#define USB_VENDOR_REQUEST_CONFIG                0x05   // OUT
 
 typedef struct
 {
     uint32_t bank;
     uint32_t size;
+    uint32_t page_size;
     uint32_t flags;
 #define DEVICE_INFO_FLAGS_BOOTLOADER             0x01
 } device_info_t;

@@ -200,16 +200,6 @@ typedef struct {
 // Packet Formats
 //
 
-// Key/Value
-typedef struct {
-    uint16_t key;
-    uint8_t flags;
-#define RF69_KV_FLAGS_GET                       (0 << 1)
-#define RF69_KV_FLAGS_SET                       (1 << 1)
-    uint8_t len;
-    uint8_t value[0];
-} __attribute__ ((packed)) rf69_kv_t;
-
 // Base Packet Header
 typedef struct {
     uint8_t len;
@@ -227,6 +217,18 @@ typedef struct {
 #define RF69_PKT_MAX                             66
 #define RF69_PKT_MAX_DATA                        (RF69_PKT_MAX - sizeof(rf69_pkt_header_t))
 
+// Key/Value
+typedef struct {
+    uint16_t key;
+    uint8_t flags;
+#define RF69_KV_FLAGS_GET                       (0 << 1)
+#define RF69_KV_FLAGS_SET                       (1 << 1)
+    uint8_t len;
+    uint8_t value[0];
+} __attribute__ ((packed)) rf_kv_pkt_t;
+
+#define RF69_PKT_MAX_KV_DATA                    (RF69_PKT_MAX - sizeof(rf69_pkt_header_t) - \
+                                                 sizeof(rf_kv_pkt_t))
 //
 // Packet buffer format for SPI transfer
 //
@@ -249,6 +251,31 @@ typedef struct rfbuf {
     rf69_spi_pkt_t *pkt;
 } rfbuf_t;
 
+
+// KV Handler Callback Typedef
+typedef void (*rf_kv_cb_t)(volatile rfbuf_t *buf,
+                           rf69_pkt_header_t *hdr,
+                           rf_kv_pkt_t *kv,
+                           void *arg);
+typedef struct {
+    uint16_t kv;
+    uint8_t flags;
+#define RF_KV_FLAGS_ALLOC                        (1 << 1)
+    rf_kv_cb_t cb;
+    void *arg;
+} rf_kv_t;
+
+// Port Handler Callback Typedef
+typedef void (*rf_port_cb_t)(volatile rfbuf_t *buf,
+                             rf69_pkt_header_t *hdr,
+                             void *arg);
+typedef struct {
+    uint8_t port;
+    uint8_t flags;
+#define RF_PORT_FLAGS_ALLOC                      (1 << 1)
+    rf_port_cb_t cb;
+    void *arg;
+} rf_port_t;
 
 //
 // Console debug
@@ -280,8 +307,19 @@ int rf69_mode_tx(spi_drv_t *spi_drv);
 int rf69_tx(spi_drv_t *spi_drv,
             uint8_t dst, uint8_t src,
             uint8_t dport, uint8_t sport,
-            uint8_t *data, uint8_t len,
+            void *data, uint8_t len,
             rf69_tx_cb_t cb, void *arg);
 
+void rf_recv(volatile rfbuf_t *buf);
+
+volatile rfbuf_t *rfbuf_alloc(void);
+void rfbuf_free(volatile rfbuf_t *entry);
+
+void rf_port_init(rf_port_t *ports, int len);
+int rf_port_register(uint8_t port, rf_port_cb_t cb, void *arg);
+
+void rf_kv_recv(volatile rfbuf_t *buf, rf69_pkt_header_t *hdr, void *arg);
+void rf_kv_init(rf_kv_t *kvs, int len);
+int rf_kv_register(uint16_t kv, rf_kv_cb_t cb, void *arg);
 
 #endif /* __RFM69HCW__ */

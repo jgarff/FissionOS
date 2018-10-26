@@ -192,6 +192,7 @@ void usb_vendor_init(void)
 {
     device_info.bank = nvm_active_bank();
     device_info.size = nvm_bank_offset();
+    device_info.page_size = NVM_PAGE_SIZE;
     device_info.flags = 0;
 
     // Register callbacks to handle vendor specific traffic.

@@ -58,13 +58,14 @@ typedef struct {
     char *filename;
     uint8_t bus;
     uint8_t device;
+    char *serial;
 } arg_t;
 
 typedef int (callback_t)(char *arg);
 
 static struct libusb_device_handle *usbdev;
 
-char *short_opts = "d:bru:i";
+char *short_opts = "d:bru:is:c:";
 
 void usage(char *argv0)
 {
@@ -72,13 +73,15 @@ void usage(char *argv0)
     printf("%s: [-d <bus:device>] <command>\n", argv0);
     printf("\n");
     printf("Arguments:\n");
-    printf("    -d <bus:device> Specify the exact device\n");
+    printf("    -d <bus:device>    Specify the exact device by USB address\n");
+    printf("    -s <serial number> Specify the exact device by serial number\n");
     printf("\n");
     printf("Commands :\n");
     printf("    -i              Device Information\n");
     printf("    -b              Reset Device to Bootloader\n");
     printf("    -r              Reset Device\n");
     printf("    -u <filename>   Upload firmware file\n");
+    printf("    -c <filename>   Upload configuration file\n");
     printf("    -h              Help\n");
     printf("\n");
 }
@@ -87,7 +90,7 @@ void usage(char *argv0)
  * USB Functions
  */
 
-int dev_open(struct libusb_device_handle **dev, int bus, int device)
+int dev_open(struct libusb_device_handle **dev, int bus, int device, char *serial)
 {
     struct libusb_device **devs;
     struct libusb_device_descriptor info;
@@ -118,22 +121,50 @@ int dev_open(struct libusb_device_handle **dev, int bus, int device)
         if ((info.idVendor == 0x0011) &&
             (info.idProduct == 0x0101))
         {
-            if (bus)
-            {
-                uint8_t bus_number = libusb_get_bus_number(devs[i]);
-                uint8_t device_addr = libusb_get_device_address(devs[i]);
+            int result;
 
-                // If the user specified a device, check to see if this is it.
-                // Continue looking if not.
-                if ((bus_number != bus) ||
-                    (device_addr != device))
+            if (serial && info.iSerialNumber)
+            {
+                uint8_t devserial[80];
+
+                result = libusb_open(devs[i], dev);
+                if (result)
                 {
                     continue;
                 }
+
+                result = libusb_get_string_descriptor_ascii(*dev, info.iSerialNumber, devserial,
+                                                            sizeof(devserial));
+
+                libusb_close(*dev);
+
+                if (result > 0)
+                {
+                    if (strcmp((char *)devserial, serial))
+                    {
+                        continue;
+                    }
+                }
+            }
+            else
+            {
+                if (bus)
+                {
+                    uint8_t bus_number = libusb_get_bus_number(devs[i]);
+                    uint8_t device_addr = libusb_get_device_address(devs[i]);
+
+                    // If the user specified a device, check to see if this is it.
+                    // Continue looking if not.
+                    if ((bus_number != bus) ||
+                        (device_addr != device))
+                    {
+                        continue;
+                    }
+                }
             }
 
-            int err = libusb_open(devs[i], dev);
-            if (err) {
+            result = libusb_open(devs[i], dev);
+            if (result) {
                 fprintf(stderr, "Unable to open device\n");
 
                 libusb_free_device_list(devs, 1);
@@ -191,9 +222,10 @@ int get_device(char *arg)
         return -1;
     }
 
-    printf("Bank: %d\n", device_info.bank);
-    printf("Size: %dKb\n", device_info.size / 1024);
-    printf("Mode: %s\n", device_info.flags & DEVICE_INFO_FLAGS_BOOTLOADER ?
+    printf("Bank      : %d\n", device_info.bank);
+    printf("Size      : %dKb\n", device_info.size / 1024);
+    printf("Page Size : %d\n", device_info.page_size);
+    printf("Mode      : %s\n", device_info.flags & DEVICE_INFO_FLAGS_BOOTLOADER ?
                          "Bootloader" : "Normal");
 
     return 0;
@@ -327,7 +359,7 @@ int update_v1(FILE *f, fwheader_t *header)
     return 0;
 }
 
-int update(char *arg)
+int update_fw(char *arg)
 {
     char *filename = arg;
     FILE *f = fopen(filename, "r");
@@ -382,11 +414,57 @@ int update(char *arg)
     return -1;
 }
 
+int update_config(char *arg)
+{
+    char *filename = arg;
+    FILE *f = fopen(filename, "r");
+    uint8_t buf[FLASH_PAGE_SIZE];
+    uint32_t addr = 0;
+    int ret, n;
+
+    if (!f)
+    {
+        fprintf(stderr, "can't open file\n");
+        return -1;
+    }
+
+    n = fread(buf, 1, sizeof(buf), f);
+    while (n > 0)
+    {
+        ret = libusb_control_transfer(usbdev,
+                                      LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR |
+                                      LIBUSB_RECIPIENT_DEVICE,
+                                      USB_VENDOR_REQUEST_CONFIG,
+                                      addr >> 16, addr & 0xffff,
+                                      buf, n, 0);
+        if (ret != n)
+        {
+            fprintf(stderr, "Config update failed %d %d\n", ret, n);
+            fclose(f);
+
+            return -1;
+        }
+
+        addr += n;
+        n = fread(buf, 1, sizeof(buf), f);
+    }
+
+    if (n < 0)
+    {
+        fprintf(stderr, "File read error\n");
+        fclose(f);
+
+        return -1;
+    }
+
+    return 0;
+}
+
 int usb_command(callback_t *callback, arg_t *arg)
 {
     int ret;
 
-    ret = dev_open(&usbdev, arg->bus, arg->device);
+    ret = dev_open(&usbdev, arg->bus, arg->device, arg->serial);
     if (ret)
     {
         printf("Device not found\n");
@@ -436,6 +514,7 @@ int main(int argc, char *argv[])
     callback_t *callback = NULL;
     arg_t arg = {
         .filename = NULL,
+        .serial = NULL,
         .bus = 0,
         .device = 0,
     };
@@ -462,8 +541,17 @@ int main(int argc, char *argv[])
                 break;
 
             case 'u':
-                callback = update;
+                callback = update_fw;
                 arg.filename = optarg;
+                break;
+
+            case 'c':
+                callback = update_config;
+                arg.filename = optarg;
+                break;
+
+            case 's':
+                arg.serial = optarg;
                 break;
 
             case 'h':

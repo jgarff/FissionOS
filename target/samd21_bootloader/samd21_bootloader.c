@@ -60,17 +60,57 @@
 #include "samd21_bootloader.h"
 
 
+int cmd_config(console_t *console, int argc, char *argv[]);
+
+
 volatile uint32_t *reset_config = RESET_CONFIG;
 
 console_t console;
 
 cmd_entry_t cmd_table[] =
 {
+    {
+        .cmdstr = "config",
+        .callback = cmd_config,
+        .usage = "  config < show >\r\n",
+        .help =
+            "  Device Configuration.\r\n"
+            "    show     : Show the device configuration.\r\n"
+    },
     CONSOLE_CMD_HELP,
     CONSOLE_CMD_NVM,
     CONSOLE_CMD_RESET,
     CONSOLE_CMD_USB,
 };
+
+int cmd_config(console_t *console, int argc, char *argv[])
+{
+    if (argc < 2)
+    {
+        cmd_help_usage(console, argv[0]);
+        return 0;
+    }
+
+    if (!strcmp(argv[1], "show"))
+    {
+        console_print(console, "Magic   : %08x\r\n", CONFIG->magic);
+        console_print(console, "Version : %d.%d.%d.%d\r\n",
+                CONFIG->version.major,
+                CONFIG->version.minor,
+                CONFIG->version.micro,
+                CONFIG->version.nano);
+        console_print(console, "Flags   : %08x\r\n", CONFIG->flags);
+        console_print(console, "Serial  : %08x%08x\r\n",
+                ((uint32_t *)&CONFIG->serial)[1],
+                ((uint32_t *)&CONFIG->serial)[0]);
+        console_print(console, "CRC     : %08x\r\n", CONFIG->crc);
+    } else {
+        cmd_help_usage(console, argv[0]);
+        return 0;
+    }
+
+    return 0;
+}
 
 //
 // TODO:  Remove the following place holder functions when suitable functions
@@ -256,6 +296,8 @@ int main(int argc, char *argv[])
     port_peripheral_enable(USB_DN_PORT, USB_DN_PIN, USB_DN_MUX);
     usb_init();
 
+    // TODO:  Validate the configuration CRC
+    usb_serial_fixup(CONFIG->serial);
     usb_serial_init(usb_console_rx_callback, &console);
     usb_control0_init((char *)&usb_desc, usb_desc_len,
                       (char *)&usb_config, usb_config_len,

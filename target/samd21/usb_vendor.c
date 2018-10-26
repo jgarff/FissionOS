@@ -137,6 +137,7 @@ void usb_vendor_init(void)
 {
     device_info.bank = 0;
     device_info.size = FLASH_SIZE;
+    device_info.page_size = NVM_PAGE_SIZE;
     device_info.flags = 0;
 
     // Register callbacks to handle vendor specific traffic.
