@@ -65,30 +65,107 @@ typedef int (callback_t)(char *arg);
 
 static struct libusb_device_handle *usbdev;
 
-char *short_opts = "d:bru:is:c:";
+char *short_opts = "ld:bru:is:c:";
 
 void usage(char *argv0)
 {
     printf("\n");
-    printf("%s: [-d <bus:device>] <command>\n", argv0);
+    printf("%s: <-h> | <-l> | [-d <bus:device>] <command>\n", argv0);
     printf("\n");
     printf("Arguments:\n");
     printf("    -d <bus:device>    Specify the exact device by USB address\n");
     printf("    -s <serial number> Specify the exact device by serial number\n");
+    printf("    -l                 List Available Devices\n");
+    printf("    -h                 Help\n");
     printf("\n");
     printf("Commands :\n");
-    printf("    -i              Device Information\n");
-    printf("    -b              Reset Device to Bootloader\n");
-    printf("    -r              Reset Device\n");
-    printf("    -u <filename>   Upload firmware file\n");
-    printf("    -c <filename>   Upload configuration file\n");
-    printf("    -h              Help\n");
+    printf("    -i                 Device Information\n");
+    printf("    -b                 Reset Device to Bootloader\n");
+    printf("    -r                 Reset Device\n");
+    printf("    -u <filename>      Upload firmware file\n");
+    printf("    -c <filename>      Upload configuration file\n");
     printf("\n");
 }
 
 /*
  * USB Functions
  */
+
+int dev_list(void)
+{
+    struct libusb_device_handle **dev = &usbdev;
+    struct libusb_device **devs;
+    struct libusb_device_descriptor info;
+    unsigned count, i, found = 0;
+
+    *dev = NULL;
+
+    if (libusb_init(NULL))
+    {
+        fprintf(stderr, "libusb_init failed\n");
+
+        return -1;
+    }
+
+      // get list of devices and counts
+    count = libusb_get_device_list(NULL, &devs);
+    if (count <= 0)
+    {
+        fprintf(stderr, "Error enumerating devices\n");
+        return -1;
+    }
+
+    printf("\n%6s %6s %10s\n", "Bus", "Device", "Serial");
+    printf("%6s %6s %10s\n", "---", "------", "------");
+
+    for (i = 0; i < count; i++)
+    {
+        libusb_get_device_descriptor(devs[i], &info);
+
+        if ((info.idVendor == 0x0011) &&
+            (info.idProduct == 0x0101))
+        {
+            int result;
+
+            if (info.iSerialNumber)
+            {
+                uint8_t devserial[80];
+
+                result = libusb_open(devs[i], dev);
+                if (result)
+                {
+                    continue;
+                }
+
+                result = libusb_get_string_descriptor_ascii(*dev, info.iSerialNumber, devserial,
+                                                            sizeof(devserial));
+
+                libusb_close(*dev);
+
+                if (result > 0)
+                {
+                    printf("%6d %6d %10s\n", 
+                            libusb_get_bus_number(devs[i]),
+                            libusb_get_port_number(devs[i]),
+                            devserial);
+                    found = 1;
+                }
+            }
+        }
+    }
+
+    printf("\n");
+
+    if (!found) {
+        printf("None found\n");
+    }
+   
+    libusb_free_device_list(devs, 1);
+
+    libusb_exit(NULL);
+
+    return 0;
+}
 
 int dev_open(struct libusb_device_handle **dev, int bus, int device, char *serial)
 {
@@ -222,11 +299,13 @@ int get_device(char *arg)
         return -1;
     }
 
+    printf("\n");
     printf("Bank      : %d\n", device_info.bank);
     printf("Size      : %dKb\n", device_info.size / 1024);
     printf("Page Size : %d\n", device_info.page_size);
     printf("Mode      : %s\n", device_info.flags & DEVICE_INFO_FLAGS_BOOTLOADER ?
                          "Bootloader" : "Normal");
+    printf("\n");
 
     return 0;
 }
@@ -524,6 +603,10 @@ int main(int argc, char *argv[])
     {
         switch (opt)
         {
+            case 'l':
+                dev_list();
+                return 0;
+
             case 'd':
                 strtodev(optarg, &arg);
                 break;
