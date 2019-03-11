@@ -1,5 +1,5 @@
 /*
- * samd53.c
+ * same53.c
  *
  * Copyright (c) 2017-2018 Jeremy Garff
  *
@@ -73,8 +73,8 @@
 #include "usb_serial.h"
 #include "usb_vendor.h"
 
-#include "samd53_version.h"
-#include "samd53.h"
+#include "same53_version.h"
+#include "same53.h"
 
 #define ADC_ADJUST_MAX                           SYSTICK_FREQ
 

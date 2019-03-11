@@ -39,7 +39,7 @@ Import('targets')
 
 tools_env = targets['tools']['ENV'].Clone()
 
-tools_env.MergeFlags({ 'CPPPATH' : '../target/samd53'})
+tools_env.MergeFlags({ 'CPPPATH' : '../target/same53'})
 
 update = tools_env.Program('update.c', LIBS=['usb-1.0'])
 
