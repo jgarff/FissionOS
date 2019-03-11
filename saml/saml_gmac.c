@@ -140,7 +140,7 @@ static void gmac_man_disable(void)
 {
     uint32_t tmp = GMAC->ncr;
 
-	tmp &= ~GMAC_NCR_MPE;
+    tmp &= ~GMAC_NCR_MPE;
     write32((uint32_t *)&GMAC->ncr, tmp);
 }
 
@@ -179,7 +179,35 @@ int gmac_link_change_handle(void)
 {
     uint32_t tmp, reg, ncfgr = 0;
 
+    // Turn off transmit and receive for link change update
+    tmp = GMAC->ncr & ~(GMAC_NCR_RXEN | GMAC_NCR_TXEN);
+    write32((uint32_t *)&GMAC->ncr, tmp);
+
     gmac_man_enable();
+
+    //reg = gmac_phy_read(gmac_phy_addr, PHY_BMCR);
+    //reg |= PHY_BMCR_LOOPBACK;
+    //gmac_phy_write(gmac_phy_addr, PHY_BMCR, reg);
+
+    // Override stapping for auto-negotiation 100/10 FD/HD supported.
+    reg = gmac_phy_read(gmac_phy_addr, PHY_BMCR);
+    reg &= ~(PHY_BMCR_AUTONEG_ENABLE | PHY_BMCR_LOOPBACK | PHY_BMCR_POWERDOWN);
+    reg |= PHY_BMCR_ISOLATE;
+    gmac_phy_write(gmac_phy_addr, PHY_BMCR, reg);
+
+    reg = PHY_ANLPAR_100TX_HDX | PHY_ANLPAR_100TX_FDX |
+          PHY_ANLPAR_10_HDX | PHY_ANLPAR_10_FDX |
+          PHY_ANLPAR_IEEE_802_3;
+    gmac_phy_write(gmac_phy_addr, PHY_ANAR, reg);
+
+    reg = gmac_phy_read(gmac_phy_addr, PHY_BMCR);
+    reg |= PHY_BMCR_SPEED_100 | PHY_BMCR_FULL_DUPLEX | PHY_BMCR_AUTONEG_ENABLE;
+    gmac_phy_write(gmac_phy_addr, PHY_BMCR, reg);
+
+    // Restart auto-negotiation
+    reg &= ~PHY_BMCR_ISOLATE;
+    reg |= PHY_BMCR_AUTONEG_RESTART;
+    gmac_phy_write(gmac_phy_addr, PHY_BMCR, reg);
 
     // Wait for autonegotiation complete
     do
@@ -191,34 +219,38 @@ int gmac_link_change_handle(void)
     reg = gmac_phy_read(gmac_phy_addr, PHY_ANLPAR);
 
     // Configure speed
-	if ((reg & PHY_ANLPAR_100TX_FDX) || (reg & PHY_ANLPAR_100TX_HDX))
-	{
+    if ((reg & PHY_ANLPAR_100TX_FDX) || (reg & PHY_ANLPAR_100TX_HDX))
+    {
         ncfgr |= GMAC_NCFGR_SPD;
-	}
-	else
-	{
+    }
+    else
+    {
         ncfgr &= ~GMAC_NCFGR_SPD;
-	}
+    }
 
     // Configure duplex
-	if ((reg & PHY_ANLPAR_100TX_FDX) || (reg & PHY_ANLPAR_10_FDX))
-	{
+    if ((reg & PHY_ANLPAR_100TX_FDX) || (reg & PHY_ANLPAR_10_FDX))
+    {
         ncfgr |= GMAC_NCFGR_FD;
-	}
-	else
-	{
+    }
+    else
+    {
         ncfgr &= ~GMAC_NCFGR_FD;
-	}
+    }
+
+    // For debugging promisc
+    //ncfgr |= GMAC_NCFGR_CAF;
 
     GMAC->ncfgr = ncfgr;
 
     gmac_man_disable();
 
-    // For loopback mode debugging
-    //GMAC->ncr |= GMAC_NCR_LB | GMAC_NCR_LBL;
-
     // Start transmit/recieve
     tmp = GMAC->ncr | GMAC_NCR_RXEN | GMAC_NCR_TXEN | GMAC_NCR_WESTAT;
+
+    // For loopback mode debugging
+    //tmp |= GMAC_NCR_LBL;
+
     write32((uint32_t *)&GMAC->ncr, tmp);
 
     return 0;
@@ -258,7 +290,7 @@ err_t gmac_tx(struct netif *netif, struct pbuf *p)
         desc = &gmac->txdesc[gmac->txbuf_next];
     }
 
-	for (q = p; q != NULL; q = q->next)
+    for (q = p; q != NULL; q = q->next)
     {
         uint8_t *txbuf = (uint8_t *)desc->addr;
 

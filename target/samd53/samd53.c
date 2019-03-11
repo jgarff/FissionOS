@@ -79,7 +79,7 @@
 #define ADC_ADJUST_MAX                           SYSTICK_FREQ
 
 #define PHY_ADDR                                 0x00
-uint8_t mac_addr[6] = { 0xb8, 0x27, 0xeb, 0x05, 0x45, 0xd5 };
+uint8_t mac_addr[6] = { 0x00, 0x27, 0xeb, 0x05, 0x45, 0xd5 };
 
 gmac_txbuf_desc_t gmac_txdesc[2];
 uint8_t gmac_txpool[GMAC_TXBUF_SIZE * ARRAY_SIZE(gmac_txdesc)];
@@ -165,10 +165,10 @@ cmd_entry_t cmd_table[] =
             "    avgsecs    : <seconds>\r\n"
             "                 Number of seconds for light change transisiton\r\n",
     },
-    //{
-    //    .cmdstr = "threads",
-    //    .callback = cmd_threads,
-    //},
+    {
+        .cmdstr = "threads",
+        .callback = cmd_threads,
+    },
     CONSOLE_CMD_USB,
 };
 
@@ -178,6 +178,11 @@ int cmd_ipstats(console_t *console, int argc, char *argv[])
     console_print(console, "\r\n");
     return 0;
 }
+
+const http_cgi_table_t http_cgi[] =
+{
+};
+const uint32_t http_cgi_table_count = ARRAY_SIZE(http_cgi);
 
 
 adc_desc_t adc0;
@@ -482,6 +487,7 @@ ext_int_t vbus =
     .arg = NULL,
 };
 
+mailbox_t net_start;
 void gmac_link_change_worker(void *arg);
 static workqueue_t link_wq =
 {
@@ -495,12 +501,7 @@ void gmac_link_change_worker(void *arg)
         return;
     }
 
-    tcpip_init(NULL, NULL);
-    netif_add(&gmac.netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, tcpip_input);
-    netif_set_default(&gmac.netif);
-    netif_set_up(&gmac.netif);
-
-    dhcp_start(&gmac.netif);
+    mailbox_send(&net_start, NULL);
 }
 
 void clock_init(void)
@@ -619,11 +620,12 @@ void clock_init(void)
 int main(int argc, char *argv[])
 {
     volatile mclk_t *mclk = MCLK;
-    volatile int delay = 10000;
+    volatile int delay = 100000;
+    struct netconn *http_netconn;
+    void *msg;
 
     clock_init();
     systick_init(GCLK0_HZ);
-    thread_init();
 
     //
     // Setup the UART
@@ -673,21 +675,18 @@ int main(int argc, char *argv[])
     port_peripheral_enable(GMAC_MDC_PORT, GMAC_MDC_PIN, GMAC_MUX);
     port_peripheral_enable(GMAC_MDIO_PORT, GMAC_MDIO_PIN, GMAC_MUX);
 
-    port_strength(GMAC_GTXCK_PORT, GMAC_GTXCK_PIN, PORT_DRIVE_HIGH);
-    port_strength(GMAC_CRS_PORT, GMAC_CRS_PIN, PORT_DRIVE_HIGH);
-    port_strength(GMAC_GTXEN_PORT, GMAC_GTXEN_PIN, PORT_DRIVE_HIGH);
-    port_strength(GMAC_GTX0_PORT, GMAC_GTX0_PIN, PORT_DRIVE_HIGH);
-    port_strength(GMAC_GTX1_PORT, GMAC_GTX1_PIN, PORT_DRIVE_HIGH);
-    port_strength(GMAC_GRX0_PORT, GMAC_GRX0_PIN, PORT_DRIVE_HIGH);
-    port_strength(GMAC_GRX1_PORT, GMAC_GRX1_PIN, PORT_DRIVE_HIGH);
-    port_strength(GMAC_GRXER_PORT, GMAC_GRXER_PIN, PORT_DRIVE_HIGH);
-    port_strength(GMAC_MDC_PORT, GMAC_MDC_PIN, PORT_DRIVE_HIGH);
-    port_strength(GMAC_MDIO_PORT, GMAC_MDIO_PIN, PORT_DRIVE_HIGH);
+    port_strength(GMAC_GTXCK_PORT, GMAC_GTXCK_PIN, PORT_DRIVE_LOW);
+    port_strength(GMAC_GTXEN_PORT, GMAC_GTXEN_PIN, PORT_DRIVE_LOW);
+    port_strength(GMAC_GTX0_PORT, GMAC_GTX0_PIN, PORT_DRIVE_LOW);
+    port_strength(GMAC_GTX1_PORT, GMAC_GTX1_PIN, PORT_DRIVE_LOW);
+    port_strength(GMAC_MDC_PORT, GMAC_MDC_PIN, PORT_DRIVE_LOW);
+    port_strength(GMAC_MDIO_PORT, GMAC_MDIO_PIN, PORT_DRIVE_LOW);
 
     //
     // Release Phy Reset
     //
     port_peripheral_disable(PRST_PORT, PRST_PIN);
+    port_strength(GMAC_MDIO_PORT, GMAC_MDIO_PIN, PORT_DRIVE_HIGH);
     port_dir(PRST_PORT, PRST_PIN, 1);
     port_set(PRST_PORT, PRST_PIN, 0);
     while (delay)
@@ -763,6 +762,8 @@ int main(int argc, char *argv[])
                  &dbg_uart);
 #endif /* UART_CONSOLE */
 
+    thread_init(&console);
+
     //
     // Status LED
     //
@@ -783,14 +784,20 @@ int main(int argc, char *argv[])
 
     // Start the ethernet link worker
     gmac_link_change_worker(NULL);
+    mailbox_recv(&net_start, &msg, 0);
+
+    tcpip_init(NULL, NULL);
+    netif_add(&gmac.netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, tcpip_input);
+    netif_set_default(&gmac.netif);
+    netif_set_up(&gmac.netif);
+
+    dhcp_start(&gmac.netif);
 
     // Mainloop
+    http_netconn = http_service_start();
     while (1)
     {
-        if (!workqueue_handle_next())
-        {
-            cpu_sleep();
-        }
+        http_mainloop(http_netconn);
     }
 
     return 0;

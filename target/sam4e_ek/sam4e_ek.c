@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
 
     clock_init();
     systick_init(INTERNAL_CLK_FREQ);
-    thread_init();
+    thread_init(NULL);
 
     LED_INIT(GPIOD, (1 << 22));
     LED_ON(GPIOD, (1 << 22));

@@ -120,7 +120,7 @@
 #define GMAC_MDC_PIN                             14
 #define GMAC_MDIO_PORT                           PORTB
 #define GMAC_MDIO_PIN                            15
-#define GMAC_MUX                                 0xb
+#define GMAC_MUX                                 11
 
 #define LED_PORT                                 PORTB
 #define LED_PIN                                  10

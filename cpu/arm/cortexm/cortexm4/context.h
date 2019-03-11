@@ -36,6 +36,7 @@
 #ifndef __CONTEXT_H__
 #define __CONTEXT_H__
 
+#include "console.h"
 
 #include "vectors.h"
 
@@ -93,8 +94,7 @@ void thread_waiter_queue(thread_list_t *head, thread_t *thread);
 thread_t *thread_waiter_dequeue(thread_list_t *head);
 void thread_waiter_remove(thread_t *thread);
 
-
-void thread_init(void);
+void thread_init(console_t *debug_console);
 
 
 #endif /* __CONTEXT_H__ */

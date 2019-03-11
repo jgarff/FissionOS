@@ -218,7 +218,15 @@ board_info = {
               samd53/usb_config.c
               samd53/usb_vendor.c
         '''),
-        [],
+        Split('''
+            samd53/romfs/graph.js
+            samd53/romfs/index.html
+            samd53/romfs/net.html
+            samd53/romfs/site.css
+            samd53/romfs/site.js
+            samd53/romfs/util.html
+            samd53/romfs/target.html
+        '''),
     ],
 
     'imx6_memtest' : [

@@ -43,7 +43,9 @@
 #include "vectors.h"
 
 
-void console_print(char *format, ...);
+struct console;
+struct console *exception_console = NULL;
+void console_print(struct console *console, char *format, ...);
 
 
 extern uint32_t __text_start, __data_end, __etext, __bss_start,
@@ -82,34 +84,34 @@ void irq_restore(uint32_t primask)
 void reset_handler(void);
 void thread_switch_handler(void);   /**< From context.c */
 
-void console_printreg(char *str, uint32_t val)
+void console_printreg(struct console *console, char *str, uint32_t val)
 {
-    console_print("%s%08x  ", str, (unsigned int)val);
+    console_print(console, "%s%08x  ", str, (unsigned int)val);
 }
 
 void exception_stack_display(char *regname, uint32_t sp)
 {
-    console_printreg(regname, sp);
-    console_print("\r\n");
-    console_printreg("R0:   ", ((uint32_t *)sp)[0]);
-    console_printreg("R1:   ", ((uint32_t *)sp)[1]);
-    console_printreg("R2:   ", ((uint32_t *)sp)[2]);
-    console_printreg("R3:   ", ((uint32_t *)sp)[3]);
-    console_print("\r\n");
-    console_printreg("R12:  ", ((uint32_t *)sp)[4]);
-    console_printreg("LR:   ", ((uint32_t *)sp)[5] & ~1);
-    console_printreg("PC:   ", ((uint32_t *)sp)[6]);
-    console_printreg("xPSR: ", ((uint32_t *)sp)[7]);
-    console_print("\r\n\n");
+    console_printreg(exception_console, regname, sp);
+    console_print(exception_console, "\r\n");
+    console_printreg(exception_console, "R0:   ", ((uint32_t *)sp)[0]);
+    console_printreg(exception_console, "R1:   ", ((uint32_t *)sp)[1]);
+    console_printreg(exception_console, "R2:   ", ((uint32_t *)sp)[2]);
+    console_printreg(exception_console, "R3:   ", ((uint32_t *)sp)[3]);
+    console_print(exception_console, "\r\n");
+    console_printreg(exception_console, "R12:  ", ((uint32_t *)sp)[4]);
+    console_printreg(exception_console, "LR:   ", ((uint32_t *)sp)[5] & ~1);
+    console_printreg(exception_console, "PC:   ", ((uint32_t *)sp)[6]);
+    console_printreg(exception_console, "xPSR: ", ((uint32_t *)sp)[7]);
+    console_print(exception_console, "\r\n\n");
 }
 
 void exception_handler(char *str)
 {
     uint32_t sp, psr, control, lr;
 
-    console_print("\r\n");
-    console_print(str);
-    console_print("\r\n");
+    console_print(exception_console, "\r\n");
+    console_print(exception_console, str);
+    console_print(exception_console, "\r\n");
 
     // Get the process stack pointer
     asm volatile ("mrs %0, psp;"
@@ -127,12 +129,12 @@ void exception_handler(char *str)
             );
     exception_stack_display("MSP:  ", sp);
 
-    console_printreg("SCB_CFSR:  ", SCB->cfsr);
-    console_printreg("SCB_HFSR:  ", SCB->hfsr);
-    console_print("\r\n");
-    console_printreg("SCB_MMFAR: ", SCB->mmfar);
-    console_printreg("SCB_AFSR:  ", SCB->afsr);
-    console_print("\r\n\n");
+    console_printreg(exception_console, "SCB_CFSR:  ", SCB->cfsr);
+    console_printreg(exception_console, "SCB_HFSR:  ", SCB->hfsr);
+    console_print(exception_console, "\r\n");
+    console_printreg(exception_console, "SCB_MMFAR: ", SCB->mmfar);
+    console_printreg(exception_console, "SCB_AFSR:  ", SCB->afsr);
+    console_print(exception_console, "\r\n\n");
 
     // This will contain the interrupt
     asm volatile ("mrs %0, psr;"
@@ -141,24 +143,24 @@ void exception_handler(char *str)
                   :
                  );
 
-    console_printreg("PSR: ", psr);
-    console_printreg("INT: ", psr & 0x1ff);
-    console_print("\r\n\n");
+    console_printreg(exception_console, "PSR: ", psr);
+    console_printreg(exception_console, "INT: ", psr & 0x1ff);
+    console_print(exception_console, "\r\n\n");
 
     asm volatile ("mrs %0, control;"
                   : "=r"(control)
                   :
                   :
                  );
-    console_printreg("CONTROL: ", control);
+    console_printreg(exception_console, "CONTROL: ", control);
     asm volatile ("mov %0, lr;"
                   : "=r"(lr)
                   :
                   :
                  );
-    console_printreg("LR: ", lr);
-    console_print("\r\n\n");
-    console_print("\r\n\n");
+    console_printreg(exception_console, "LR: ", lr);
+    console_print(exception_console, "\r\n\n");
+    console_print(exception_console, "\r\n\n");
 
     while(1)
         ;

@@ -57,6 +57,10 @@ void console_print(console_t *console, char *format, ...)
     va_list ap;
     int n;
 
+    if (!console) {
+        return;
+    }
+
     va_start(ap, format);
     n = vsnprintf(buf, CONSOLE_PRINT_SIZE, format, ap);
     va_end(ap);

@@ -41,6 +41,7 @@
 
 #include "workqueue.h"
 
+#include <console.h>
 
 typedef struct
 {
@@ -52,9 +53,7 @@ typedef struct
     uint32_t cpsr;
 } __attribute__ ((packed)) frame_t;
 
-
-void console_print(char *format, ...);
-
+console_t *thread_debug_console = NULL;
 
 thread_t main_thread =
 {
@@ -99,35 +98,6 @@ static inline void stack_ptr_set(void *sp)
                   :                 /* no clobbered register */
             );
 }
-
-static inline void context_save(void)
-{
-    void *sp;
-
-    /* Push everything onto the current stack */
-    asm volatile ("mrs r3, psp;"
-                  "stmdb r3!, {r4-r11};" /* r0-3 and r12 are saved by hardware */
-                  "msr psp, r3;"
-                  : "=r"(sp)        /* output register %0 */
-                  :                 /* no input */
-                  : "r3"            /* clobbered register */
-            );
-}
-
-static inline void context_restore(void)
-{
-    void *sp;
-
-    /* Restore a previous stack, stack pointer must have already been set */
-    asm volatile ("mrs r3, psp;"
-                  "ldmia r3!, {r4-r11};" /* r0-3 and r12 are restored by hardware */
-                  "msr psp, r3;"
-                  : "=r"(sp)        /* output register %0 */
-                  :                 /* no input */
-                  : "r3"            /* clobbered register */
-            );
-}
-
 
 static void thread_list_unlink(thread_list_t *thread)
 {
@@ -233,8 +203,10 @@ __attribute__ ((noinline)) static void thread_switch_next(void)
     next = thread_active.next;
     if (next == &thread_active)
     {
-        console_print("Threading Exception, no active thread,\r\n");
-        console_print("idle/workqueue thread may be blocking.\r\n");
+        if (thread_debug_console) {
+            console_print(thread_debug_console, "Threading Exception, no active thread,\r\n");
+            console_print(thread_debug_console, "idle/workqueue thread may be blocking.\r\n");
+        }
         // There should always be a active idle thread, however if not
         // just keep using the current thread.
         return;
@@ -248,11 +220,29 @@ __attribute__ ((noinline)) static void thread_switch_next(void)
 }
 
 /* Registered as the svcall handler, interrupt context */
-void thread_switch_handler(void)
+__attribute__ ((naked)) void thread_switch_handler(void)
 {
-    context_save();
+    /* Push everything onto the current process stack */
+    asm volatile ("mrs r3, psp;"
+                  "stmdb r3!, {r4-r11};" /* r0-3 and r12 are saved by hardware */
+                  "msr psp, r3;"
+                  :                 /* output register %0 */
+                  :                 /* no input */
+                  : "r3"            /* clobbered register */
+            );
+
     thread_switch_next();
-    context_restore();
+
+    /* Restore a previous process stack, stack pointer must have already been set in thread_switch_next */
+    asm volatile ("mrs r3, psp;"
+                  "ldmia r3!, {r4-r11};" /* r0-3 and r12 are restored by hardware */
+                  "msr psp, r3;"
+                  :                 /* output register %0 */
+                  :                 /* no input */
+                  : "r3"            /* clobbered register */
+            );
+
+    asm volatile ("mov lr, 0xfffffffd; bx lr;");
 }
 
 
@@ -318,15 +308,16 @@ static void thread_workqueue_loop(void *arg)
     }
 }
 
-void thread_init(void)
+void thread_init(console_t *debug_console)
 {
+    thread_debug_console = debug_console;
+
     thread_new(&thread_workqueue, thread_workqueue_stack, sizeof(thread_workqueue_stack),
                thread_workqueue_loop, NULL);
 }
 
 
-#ifdef IMPLEMENT_IN_COMMON
-int cmd_threads(uart_drv_t *uart, int argc, char *argv[])
+int cmd_threads(console_t *console, int argc, char *argv[])
 {
     const char *states[] =
     {
@@ -342,11 +333,11 @@ int cmd_threads(uart_drv_t *uart, int argc, char *argv[])
     int i;
 
     // Header
-    console_print("\n%-12s %-8s %-8s %-8s %s\r\n\n",
+    console_print(console, "\n%-12s %-8s %-8s %-8s %s\r\n\n",
                   "State", "Thread *", "SP", "LR", "Name");
 
     // Running is not on any list and is always printed first
-    console_print("%-12s %08x %08x %-8s %s\r\n", "Running",
+    console_print(console, "%-12s %08x %08x %-8s %s\r\n", "Running",
                   (uint32_t)thread_current, (uint32_t)thread_current->stack, "N/A",
                   thread_current->name ? thread_current->name : "N/A");
 
@@ -359,7 +350,7 @@ int cmd_threads(uart_drv_t *uart, int argc, char *argv[])
             thread_t *thread = thread_from_state_list(next);
             frame_t *stack = (frame_t *)thread->stack;
 
-            console_print("%-12s %08x %08x %08x %s\r\n", states[thread->state],
+            console_print(console, "%-12s %08x %08x %08x %s\r\n", states[thread->state],
                           (uint32_t)thread, (uint32_t)thread->stack,
                           stack->lr & 0xfffffffe,
                           thread->name ? thread->name : "N/A");
@@ -367,9 +358,8 @@ int cmd_threads(uart_drv_t *uart, int argc, char *argv[])
             next = next->next;
         }
     }
-    console_print("\n");
+    console_print(console, "\n");
 
     return 0;
 }
-#endif
 
