@@ -219,13 +219,11 @@ board_info = {
               same53/usb_vendor.c
         '''),
         Split('''
-            same53/romfs/graph.js
             same53/romfs/index.html
             same53/romfs/net.html
             same53/romfs/site.css
             same53/romfs/site.js
             same53/romfs/util.html
-            same53/romfs/target.html
         '''),
     ],
 
