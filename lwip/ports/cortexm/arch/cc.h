@@ -83,6 +83,5 @@ typedef uint16_t u16_t;
 typedef int16_t s16_t;
 typedef uint32_t u32_t;
 typedef int32_t s32_t;
-typedef int mem_ptr_t;
 
 #endif /* __CC_H__ */

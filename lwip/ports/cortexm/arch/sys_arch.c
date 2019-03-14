@@ -177,3 +177,6 @@ void sys_init(void)
 {
 }
 
+u32_t sys_now(void) {
+    return (ticks * 1000) / SYSTICK_FREQ;
+}

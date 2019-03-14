@@ -84,8 +84,8 @@ console_t console;
 uint8_t mac_addr[6] = { 0xb8, 0x27, 0xeb, 0x05, 0x45, 0xd5 };
 
 /* Network interface global variables */
-static struct ip_addr ipaddr, netmask;
-static struct ip_addr gw;
+static struct ip4_addr ipaddr, netmask;
+static struct ip4_addr gw;
 
 /*
  * Command callbacks
@@ -281,6 +281,9 @@ int main(int argc, char *argv[])
     mailbox_recv(&net_start, &msg, 0);
 
     tcpip_init(NULL, NULL);
+    ip4_addr_set_zero(&ipaddr);
+    ip4_addr_set_zero(&netmask);
+    ip4_addr_set_zero(&gw);
     netif_add(&gmac.netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, tcpip_input);
     netif_set_default(&gmac.netif);
     netif_set_up(&gmac.netif);

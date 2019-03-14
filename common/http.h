@@ -36,6 +36,9 @@
 #ifndef __HTTP_H__
 #define __HTTP_H__
 
+#include <lwip/api.h>
+#include <lwip/netbuf.h>
+
 struct http_cgi_table;
 typedef void (*http_cgi_cb_t)(struct netconn *client, struct netbuf *rxbuf, char **querystr, void *arg);
 typedef struct http_cgi_table

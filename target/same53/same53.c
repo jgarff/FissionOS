@@ -94,8 +94,8 @@ gmac_drv_t gmac =
 };
 
 /* Network interface global variables */
-static struct ip_addr ipaddr, netmask;
-static struct ip_addr gw;
+static struct ip4_addr ipaddr, netmask;
+static struct ip4_addr gw;
 
 
 #define ADC_STATE_SAMPLE                         0
@@ -787,6 +787,9 @@ int main(int argc, char *argv[])
     mailbox_recv(&net_start, &msg, 0);
 
     tcpip_init(NULL, NULL);
+    ip4_addr_set_zero(&ipaddr);
+    ip4_addr_set_zero(&netmask);
+    ip4_addr_set_zero(&gw);
     netif_add(&gmac.netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, tcpip_input);
     netif_set_default(&gmac.netif);
     netif_set_up(&gmac.netif);
