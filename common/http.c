@@ -244,7 +244,8 @@ int http_default(struct netconn *client, struct netbuf *rxbuf, char **querystr)
     }
 
     netbuf_delete(rxbuf);
-	return 0;
+
+    return 0;
 }
 
 static int http_url(struct netconn *client, struct netbuf *rxbuf, char *url_line)
@@ -272,8 +273,9 @@ static int http_url(struct netconn *client, struct netbuf *rxbuf, char *url_line
 static int http_stream(struct netconn *client)
 {
     struct netbuf *rx_buf;
-    char url_line[HTTP_MAX_URL];
+    char url_line[HTTP_MAX_URL] = {};
     int offset = 0;
+    uint8_t prev = 0;
     err_t err;
 
     err = netconn_recv(client, &rx_buf);
@@ -290,16 +292,29 @@ static int http_stream(struct netconn *client)
             switch (data[i])
             {
                 case '\r':  // Strip these
-                    break;
+                    // Make sure not to assign prev to the \r so just continue
+                    continue;
 
                 case '\n':  // Line terminator
                     url_line[offset] = 0;
-                    return http_url(client, rx_buf, url_line);
+
+                    // Continue read to a double \n to get the whole header
+                    if (prev == '\n') {
+                        return http_url(client, rx_buf, url_line);
+                    }
+
+                    break;
 
                 default:    // Append to line
-                    url_line[offset] = data[i];
-                    offset++;
+                    if (offset < (sizeof(url_line) - 1)) {
+                        url_line[offset] = data[i];
+                        offset++;
+                    }
+
+                    break;
             }
+
+            prev = data[i];
         }
 
         if (netbuf_next(rx_buf) != ERR_OK)

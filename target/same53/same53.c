@@ -790,6 +790,7 @@ int main(int argc, char *argv[])
     ip4_addr_set_zero(&ipaddr);
     ip4_addr_set_zero(&netmask);
     ip4_addr_set_zero(&gw);
+    netif_set_hostname(&gmac.netif, "same53");
     netif_add(&gmac.netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, tcpip_input);
     netif_set_default(&gmac.netif);
     netif_set_up(&gmac.netif);
