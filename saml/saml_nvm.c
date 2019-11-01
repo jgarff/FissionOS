@@ -261,6 +261,15 @@ void nvm_command(uint32_t cmd)
     nvm_busy_wait();
 }
 
+// This can only be used for erasing the user row.  Make sure to copy the first 32-bytes
+// of the factory programming to make sure nothing is lost.  See the NVM User Page Mapping
+// section for details.
+void nvm_page_erase(uint32_t addr)
+{
+    NVMCTRL->addr = addr;
+    nvm_command(NVMCTRL_CTRLB_CMD_EP);
+}
+
 void nvm_block_erase(uint32_t addr)
 {
     nvm_command(NVMCTRL_CTRLB_CMD_EB);
@@ -331,6 +340,14 @@ void nvm_write(uint32_t addr, uint8_t *data, uint32_t len)
         data += sizeof(uint32_t);
         dst++;
     }
+}
+
+
+void nvm_erase_userpage(void) {
+    nvm_page_erase((uint32_t)NVM_USER_ROW);
+}
+
+void nvm_write_userpage(uint8_t *data, uint32_t len) {
 }
 
 int nvm_active_bank(void)

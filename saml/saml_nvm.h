@@ -304,11 +304,43 @@ typedef struct nvmctrl
 #define NVMCTRL_DBGCTRL_ECCELOG                  (1 << 1)
     uint8_t  resvd_0x29;
     uint8_t  seecfg;
+#define NVMCTRL_SEECFG_WMODE                     (1 << 0)
+#define NVMCTRL_SEECFG_APRDIS                    (1 << 1)
     uint8_t  resvd_0x2b;
     uint32_t seestat;
+#define NVMCTRL_SEESTAT_ASEES                    (1 << 0)
+#define NVMCTRL_SEESTAT_LOAD                     (1 << 1)
+#define NVMCTRL_SEESTAT_BUSY                     (1 << 2)
+#define NVMCTRL_SEESTAT_LOCK                     (1 << 3)
+#define NVMCTRL_SEESTAT_RLOCK                    (1 << 4)
+#define NVMCTRL_SEESTAT_SBLK(reg)                ((reg >> 8) & 0xf)
+#define NVMCTRL_SEESTAT_PSZ(reg)                 ((reg >> 16) & 0x7)
 } __attribute__ ((packed)) nvmctrl_t;
 
 #define NVMCTRL                                  ((volatile nvmctrl_t *)0x41004000)
+
+typedef struct nvm_user
+{
+    uint64_t row0;
+#define NVM_USER_ROW0_BOD33_DISABLE              (1 << 0)
+#define NVM_USER_ROW0_BOD33_LEVEL(val)           ((val & 0xff) << 1)
+#define NVM_USER_ROW0_BOD33_ACTION(val)          ((val & 0x3) << 9)
+#define NVM_USER_ROW0_BOD33_HYST(val)            ((val & 0xf) << 11)
+#define NVM_USER_ROW0_NVM_BOOT(val)              ((val & 0xf) << 26)
+#define NVM_USER_ROW0_SEESBLK(val)               ((val & 0xf) << 32)
+#define NVM_USER_ROW0_SEEPSZ(val)                ((val & 0x7) << 36)
+#define NVM_USER_ROW0_RAM_ECCDIS                 (1 << 39)
+#define NVM_USER_ROW0_WDT_ENABLE                 (1 << 48)
+#define NVM_USER_ROW0_WDT_ALWAYS_ON              (1 << 49)
+#define NVM_USER_ROW0_WDT_PERIOD(val)            ((val & 0xf) << 50)
+#define NVM_USER_ROW0_WDT_WINDOW(val)            ((val & 0xf) << 54)
+#define NVM_USER_ROW0_WDT_EWOFFSET(val)          ((val & 0xf) << 58)
+#define NVM_USER_ROW0_WDT_WEN                    (1 << 62)
+    uint64_t row1;
+#define NVM_USER_ROW1_LOCKS(val)                 ((val & 0xffffffff) << 0)
+#define NVM_USER_ROW1_USER_PAGE(val)             ((val & 0xffffffff) << 32)
+#define NVM_USER_ROW1_FACTORY(val)               ((val & 0xffffffff) << 64
+} __attribute__((packed)) nvm_user_t;
 
 #define NVM_USER_ROW                             ((volatile nvm_user_t *)0x00804000)
 #define NVM_SOFT_CALIB_ADC                       (*(volatile uint32_t *)0x00800080)

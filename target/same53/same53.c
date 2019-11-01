@@ -179,8 +179,35 @@ int cmd_ipstats(console_t *console, int argc, char *argv[])
     return 0;
 }
 
+void http_net_xml_callback(struct netconn *client, struct netbuf *rxbuf, char **querystr, void *arg)
+{
+    int i;
+
+    http_content_type_send(client, "application/xml");
+
+    http_printf(client, "<netconfig>");
+    http_printf(client, "<dhcp>true</dhcp>");
+    http_printf(client, "<hostname>same53</hostname>");
+    http_printf(client, "<macaddr>");
+    for (i = 0; i < sizeof(mac_addr); i++) {
+        http_printf(client, "%02x", mac_addr[i]);
+    }
+    http_printf(client, "</macaddr>");
+    http_printf(client, "<ipaddr></ipaddr>");
+    http_printf(client, "<netmask></netmask>");
+    http_printf(client, "<gateway></gateway>");
+    http_printf(client, "</netconfig>");
+
+    netbuf_delete(rxbuf);
+}
+
 const http_cgi_table_t http_cgi[] =
 {
+    {
+        .name = "net_xml.cgi",
+        .callback = http_net_xml_callback,
+        .arg = NULL,
+    },
 };
 const uint32_t http_cgi_table_count = ARRAY_SIZE(http_cgi);
 
