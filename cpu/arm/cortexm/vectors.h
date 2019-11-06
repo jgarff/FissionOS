@@ -43,6 +43,8 @@
 #include "k20_vectors.h"
 #elif defined(__AT91SAML21__) || defined(__ATSAMD20__) || defined(__ATSAMD21__) || defined(__ATSAMD53__)
 #include "saml_vectors.h"
+#elif defined(__CORTEXM3__)
+#include "cortexm3_vectors.h"
 #else
 #error Unknown platform
 #endif

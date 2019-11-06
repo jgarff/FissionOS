@@ -130,6 +130,14 @@ cpu_info = {
         'imx6_ocram.ld',
         [],
     ],
+
+    'cortexm3' : [
+        'cortexm3',
+        'none',
+        'cortexm3_test.ld',
+        Split('''
+        '''),
+    ],
 }
 
 board_info = {
@@ -146,7 +154,6 @@ board_info = {
         'at91sam4e16',              # From CPU info
         Split('''
             sam4e_ek/target.c
-            sam4e_ek/swd_bitbang.c
         '''),
         Split('''
             sam4e_ek/romfs/graph.js
@@ -231,6 +238,21 @@ board_info = {
         'imx6',
         Split('''
             imx6_memtest/start.S
+        '''),
+        [],
+    ],
+
+    'imx6_memtest' : [
+        'imx6',
+        Split('''
+            imx6_memtest/start.S
+        '''),
+        [],
+    ],
+
+    'cortexm3_test' : [
+        'cortexm3',
+        Split('''
         '''),
         [],
     ],

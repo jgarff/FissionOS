@@ -51,7 +51,7 @@
 #define GDB_START_CHAR                           '$'                 //< GDB Start Command
 #define GDB_END_CHAR                             '#'                 //< GDB End Command
 
-#define GDB_COMMAND_SIZE                         128                 //< Largest recv command buffer size
+#define GDB_COMMAND_SIZE                         256                 //< Largest recv command buffer size
 #define GDB_CSUM_SIZE                            2                   //< Cksum size in bytes
 
 /*

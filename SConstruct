@@ -79,6 +79,12 @@ cortexm4_env.MergeFlags({
     'LINKFLAGS' : [ '-mcpu=cortex-m4' ],
 })
 
+cortexm3_env = cortexm_env.Clone()
+cortexm3_env.MergeFlags({
+    'CFLAGS' : [ '-mcpu=cortex-m3' ],
+    'LINKFLAGS' : [ '-mcpu=cortex-m3' ],
+})
+
 cortexm0_env = cortexm_env.Clone()
 cortexm0_env.MergeFlags({
     'CFLAGS' : [ '-mcpu=cortex-m0' ],
@@ -162,9 +168,21 @@ zynqmp_env.MergeFlags({
     'OBJPREFIX' : [ 'zynqmp_' ],
 })
 
+cortexm3_env = cortexm3_env.Clone()
+cortexm3_env.MergeFlags({
+    'CFLAGS' : [
+        '-D__CORTEXM3__',
+    ],
+    'OBJPREFIX' : [ 'cortexm3_' ],
+})
+
 targets = {
     'tools' : {
         'ENV' : tools_env,
+        'LIBS' : [],
+    },
+    'cortexm3' : {
+        'ENV' : cortexm3_env,
         'LIBS' : [],
     },
     'at91sam4sd' : {

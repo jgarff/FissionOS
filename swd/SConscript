@@ -39,6 +39,7 @@ sources = Split('''
     swd.c
     swd_gdb_backend.c
     swd_target.c
+    swd_bitbang.c
 ''')
 
 

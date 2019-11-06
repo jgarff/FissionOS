@@ -188,15 +188,36 @@ int swd_target_reset(swd_t *instance)
  */
 int swd_target_write_uint8(swd_t *instance, uint32_t addr, uint8_t data)
 {
+    uint8_t tmpbuf[sizeof(uint32_t)];
+    uint32_t *tmp = (uint32_t *)tmpbuf;
     int ret;
 
+    // Read
     ret = swd_start(instance);
     if (ret)
     {
         return ret;
     }
 
-    ret = swd_mem_write(instance, (uint32_t)addr & ~0x3, data);
+    ret = swd_mem_read(instance, (uint32_t)addr & ~0x3, tmp);
+    if (ret)
+    {
+        return ret;
+    }
+
+    swd_stop(instance);
+
+    // Modify
+    tmpbuf[addr & 0x3] = data;
+
+    // Write
+    ret = swd_start(instance);
+    if (ret)
+    {
+        return ret;
+    }
+
+    ret = swd_mem_write(instance, (uint32_t)addr & ~0x3, *tmp);
 
     swd_stop(instance);
 

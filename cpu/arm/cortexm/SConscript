@@ -49,6 +49,7 @@ platforms = [
     'atsamd20',
     'atsamd21',
     'atsamd53',
+    'cortexm3',
     'k20',
 ];
 

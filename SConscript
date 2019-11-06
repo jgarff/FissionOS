@@ -39,6 +39,7 @@ SConscript([
     'common/SConscript',
     'sam4/SConscript',
     'saml/SConscript',
+    'cortexm3/SConscript',
     'zynqmp/SConscript',
     'target/SConscript',
     'tools/SConscript',

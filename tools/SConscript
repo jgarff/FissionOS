@@ -38,10 +38,14 @@ import os
 Import('targets')
 
 tools_env = targets['tools']['ENV'].Clone()
+libs = targets['tools']['LIBS']
 
 tools_env.MergeFlags({ 'CPPPATH' : '../target/same53'})
 
 update = tools_env.Program('update.c', LIBS=['usb-1.0'])
 
-Default([update])
+pci_gdb_backend = tools_env.Program('pci_gdb_backend.c', LIBS=[libs, 'pci'])
+pci_xfer = tools_env.Program('pci_xfer.c', LIBS=[libs, 'pci'])
+
+Default([update, pci_gdb_backend, pci_xfer])
 
