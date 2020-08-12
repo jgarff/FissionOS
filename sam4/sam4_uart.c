@@ -262,6 +262,7 @@ int uart_recv(uart_drv_t *uart, uint8_t *data, int maxlen)
 static void uart_console_rx_callback(uart_drv_t *uart, void *arg)
 {
     console_rx_schedule((console_t *)arg);
+    uart_init(uart);
 }
 
 void uart_console(console_t *console, uart_drv_t *uart)

@@ -20,18 +20,18 @@
 #include "pci.h"
 
 
-char *short_opts = "o:i:rs";
+char *short_opts = "o:i:r:p:";
 
 void usage(char *argv0)
 {
     printf("\n");
-    printf("%s: <-o filename> | <-i filename> | <-r> | <-s>", argv0);
+    printf("%s: <-o filename> | <-i filename> | <-r <on | off> > | <-p <on | off> >", argv0);
     printf("\n");
     printf("Commands :\n");
     printf("    -i                 Load Memory from Filename\n");
     printf("    -o                 Read Memory to Filename\n");
-    printf("    -r                 Hold in Reset\n");
-    printf("    -s                 Start -- Reset Release\n");
+    printf("    -r  <on | off>     CPU Reset (on), Release CPU Reset (off)\n");
+    printf("    -p  <on | off>     Reset Phy (on), Release Phy Reset (off)\n");
     printf("\n");
 }
 
@@ -121,12 +121,26 @@ void reset_release(volatile uint8_t *bar) {
     sysregs->debug |= SYSREGS_DEBUG_CPU_RESET;
 }
 
+void phy_reset_hold(volatile uint8_t *bar) {
+    volatile sysregs_t *sysregs = (volatile sysregs_t *)(bar + REGION_SYSREGS_OFFSET);
+
+    sysregs->eth &= ~SYSREGS_ETH_PHY_RESETN;
+}
+
+void phy_reset_release(volatile uint8_t *bar) {
+    volatile sysregs_t *sysregs = (volatile sysregs_t *)(bar + REGION_SYSREGS_OFFSET);
+
+    sysregs->eth |= SYSREGS_ETH_PHY_RESETN;
+}
+
 int main(int argc, char *argv[]) {
     volatile uint8_t *bar;
     uint64_t base_addr;
     char *filename = NULL;
     int opt, memfd;
-    int input = 0, output = 0, reset = 0, start = 0;
+    int input = 0, output = 0, reset = 0, phy_reset = 0;
+    int cpu_reset = 0;
+    int phy_reset_val = 0;
 
     while ((opt = getopt(argc, argv, short_opts)) != -1) {
         switch (opt) {
@@ -142,10 +156,16 @@ int main(int argc, char *argv[]) {
 
             case 'r':
                 reset = 1;
+                if (!strcmp("on", optarg)) {
+                    cpu_reset = 1;
+                }
                 break;
 
-            case 's':
-                start = 1;
+            case 'p':
+                phy_reset = 1;
+                if (!strcmp("on", optarg)) {
+                    phy_reset_val = 1;
+                }
                 break;
 
             default:
@@ -154,7 +174,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (!input && !output && !reset && !start) {
+    if (!input && !output && !reset && !phy_reset) {
         usage(argv[0]);
         return -1;
     }
@@ -178,11 +198,19 @@ int main(int argc, char *argv[]) {
     }
 
     if (reset) {
-        reset_hold(bar);
+        if (cpu_reset) {
+            reset_hold(bar);
+        } else {
+            reset_release(bar);
+        }
     }
 
-    if (start) {
-        reset_release(bar);
+    if (phy_reset) {
+        if (phy_reset_val) {
+            phy_reset_hold(bar);
+        } else {
+            phy_reset_release(bar);
+        }
     }
 
     munmap((uint8_t *)bar, REGION_MAP_LEN);
